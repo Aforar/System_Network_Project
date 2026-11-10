@@ -1,0 +1,469 @@
+# 08.5 — Final Project Summary & Lessons Learned
+
+## 1. Project Information
+
+| Item | Details |
+|---|---|
+| Project Name | Active Directory Multi-Site and Replication Infrastructure |
+| Project Category | IT Infrastructure / Systems Administration |
+| Project Type | Practical Infrastructure Lab |
+| Virtualization Platform | VMware Workstation |
+| Server Operating System | Windows Server 2022 |
+| Client Operating System | Windows 11 Pro |
+| Active Directory Domain | `adlab.test` |
+| Number of Sites | 2 |
+| Number of Domain Controllers | 2 |
+| Number of Client Workstations | 1 |
+| Routing Component | Windows Server 2022 |
+| Project Status | Completed |
+
+---
+
+## 2. Executive Project Summary
+
+This project involved designing, deploying, configuring, and validating a two-site Microsoft Active Directory infrastructure using Windows Server 2022 and VMware Workstation.
+
+The primary objective was to build a functional enterprise-style directory services environment that connects a Headquarters (HQ) network with a Branch network.
+
+The infrastructure was designed around a single Active Directory forest and domain, `adlab.test`, with two domain controllers distributed across separate network subnets and Active Directory sites.
+
+The implementation included:
+
+- Virtual infrastructure preparation and operating system installation.
+- Network segmentation and inter-site routing.
+- Active Directory Domain Services deployment.
+- DNS configuration and domain controller promotion.
+- Active Directory Sites and Services configuration.
+- Domain controller replication.
+- Organizational Unit and security group design.
+- Domain user and workstation management.
+- Group Policy configuration.
+- SYSVOL and NETLOGON validation.
+- Authentication, DNS, replication, and policy testing.
+- Controlled domain controller outage and recovery testing.
+
+The project was completed through eight implementation and documentation phases, resulting in a functional multi-site Active Directory lab supported by technical documentation and validation evidence.
+
+---
+
+## 3. Project Objectives and Achievements
+
+The project aimed to reproduce essential components of a distributed Windows enterprise environment.
+
+| Objective | Implementation | Status |
+|---|---|---|
+| Build a virtual infrastructure | Created the required virtual machines in VMware Workstation | Completed |
+| Separate HQ and Branch networks | Configured two independent `/24` subnets | Completed |
+| Enable communication between sites | Configured inter-site routing | Completed |
+| Deploy Active Directory | Created the `adlab.test` forest and domain | Completed |
+| Deploy multiple domain controllers | Installed DC-HQ and DC-BRANCH | Completed |
+| Configure DNS | Configured AD-integrated DNS and service records | Completed |
+| Implement multiple AD sites | Created HQ-Site and Branch-Site | Completed |
+| Configure replication topology | Configured the HQ-BRANCH-SiteLink | Completed |
+| Organize directory objects | Created OUs, users, and security groups | Completed |
+| Manage workstation security | Configured and validated Group Policy | Completed |
+| Validate domain services | Tested authentication, DNS, replication, and SYSVOL | Completed |
+| Test basic failure recovery | Tested temporary Branch DC shutdown and restart | Completed |
+
+---
+
+## 4. Final Infrastructure Overview
+
+### 4.1 Physical and Logical Architecture
+
+The lab uses four virtual machines:
+
+| Virtual Machine | Operating System | Primary Role | IPv4 Address |
+|---|---|---|---|
+| DC-HQ | Windows Server 2022 | HQ Domain Controller, DNS, Global Catalog | `192.168.10.10` |
+| DC-BRANCH | Windows Server 2022 | Branch Domain Controller, DNS, Global Catalog | `192.168.20.10` |
+| CLIENT-HQ | Windows 11 Pro | Domain-joined workstation | `192.168.10.20` |
+| RTR-HQ-BRANCH | Windows Server 2022 | Inter-site router | Two network interfaces |
+
+### 4.2 Network Architecture
+
+| Network | Subnet | Gateway |
+|---|---|---|
+| HQ | `192.168.10.0/24` | `192.168.10.254` |
+| Branch | `192.168.20.0/24` | `192.168.20.254` |
+
+VMware network mapping:
+
+- `VMnet2`: HQ network.
+- `VMnet3`: Branch network.
+
+The routing virtual machine provides communication between the two subnets.
+
+### 4.3 Active Directory Architecture
+
+**Forest and domain:**
+
+```text
+adlab.test
+```
+
+**Active Directory Sites:**
+
+```text
+Active Directory Sites
+│
+├── HQ-Site
+│   └── DC-HQ
+│
+└── Branch-Site
+    └── DC-BRANCH
+```
+
+**Configured site link:**
+
+```text
+HQ-BRANCH-SiteLink
+├── HQ-Site
+└── Branch-Site
+
+Cost: 100
+Replication Interval: 15 minutes
+```
+
+### 4.4 Directory Structure
+
+The implemented Organizational Unit structure:
+
+```text
+ADLAB
+│
+├── Users
+│   ├── IT
+│   ├── HR
+│   └── General
+│
+├── Groups
+│
+└── Computers
+    ├── Workstations
+    └── Servers
+```
+
+**Security groups:**
+
+- `GG_IT_Support`
+- `GG_HR`
+- `GG_Employees`
+
+**Test user accounts:**
+
+- `it.admin`
+- `hr.user`
+- `employee01`
+
+### 4.5 Group Policy Architecture
+
+Two Group Policy Objects were implemented:
+
+| GPO | Scope | Main Purpose |
+|---|---|---|
+| `GPO-Domain-Account-Policy` | Domain root | Password and account lockout policies |
+| `GPO-Workstation-Security-Baseline` | Workstations OU | Interactive logon and workstation security settings |
+
+The policies were validated using Group Policy refresh, `gpresult`, and client-side checks.
+
+---
+
+## 5. Technologies and Tools Used
+
+The following technologies and tools were used during the project.
+
+| Technology / Tool | Purpose |
+|---|---|
+| VMware Workstation | Virtual machine creation and management |
+| Windows Server 2022 | Server operating system |
+| Windows 11 Pro | Domain client operating system |
+| Active Directory Domain Services | Centralized identity and directory management |
+| DNS Server | Domain name resolution and AD service discovery |
+| Active Directory Sites and Services | Site and subnet organization |
+| Active Directory Replication | Synchronization between domain controllers |
+| DFS Replication (DFSR) | SYSVOL replication |
+| Group Policy Management | Centralized policy configuration |
+| Active Directory Users and Computers | User, group, OU, and computer management |
+| Windows Server Routing | Inter-site network communication |
+| PowerShell | Administrative configuration and verification |
+| Command Prompt | Network and Active Directory diagnostics |
+| DCDIAG | Domain controller diagnostic checks |
+| REPADMIN | Replication monitoring and synchronization |
+| NSLOOKUP | DNS troubleshooting |
+| GPRESULT | Group Policy result verification |
+
+---
+
+## 6. Validation and Final Results
+
+The final validation phase covered six major areas.
+
+| Validation Area | Test Performed | Final Result |
+|---|---|---|
+| Authentication | Domain user logon and identity verification | Passed |
+| DNS | Domain, host, LDAP, and Kerberos record resolution | Passed |
+| Replication | Replication status and test object synchronization | Passed |
+| SYSVOL and NETLOGON | Share availability and DFSR checks | Passed |
+| Group Policy | Policy refresh and client-side verification | Passed |
+| Failure Recovery | Controlled Branch DC shutdown and restart | Passed |
+
+The validation process confirmed that the implemented services operated successfully under the tested conditions.
+
+### Failure Recovery Test Summary
+
+A controlled shutdown of `DC-BRANCH` was performed to test the availability of the HQ domain controller.
+
+During the test:
+
+1. `DC-BRANCH` was shut down.
+2. `DC-HQ` remained operational.
+3. `CLIENT-HQ` successfully authenticated using a previously logged-on account.
+4. The logon server information identified `DC-HQ`.
+5. `DC-BRANCH` was restarted.
+6. Required services, replication, and SYSVOL/NETLOGON availability were checked again.
+
+The test demonstrated basic service continuity through the HQ domain controller and successful recovery of the Branch domain controller.
+
+It did not establish full production high availability or disaster recovery.
+
+---
+
+## 7. Technical Challenges and Lessons Learned
+
+The implementation provided practical experience with several important infrastructure administration concepts.
+
+### 7.1 Network Addressing and Routing
+
+**Challenge:** Maintaining correct network addressing and avoiding IP conflicts between virtual network components.
+
+**Lesson learned:**
+
+- Plan IP addressing before deploying domain services.
+- Assign static IP addresses to infrastructure servers.
+- Keep gateway and DNS settings consistent with the network design.
+- Validate connectivity between subnets before promoting additional domain controllers.
+
+**Practical takeaway:** Network connectivity is a prerequisite for reliable multi-site Active Directory deployment.
+
+### 7.2 DNS and Active Directory Integration
+
+**Challenge:** Ensuring that domain controllers and clients can locate Active Directory services.
+
+**Lesson learned:**
+
+- Active Directory depends heavily on DNS.
+- Domain controllers register service records used by domain clients.
+- Incorrect DNS configuration can affect domain joining, authentication, and replication.
+- DNS should be validated before investigating higher-level Active Directory problems.
+
+**Practical takeaway:** DNS is a core dependency of Active Directory, not merely an optional network service.
+
+### 7.3 Domain Controller Promotion
+
+**Challenge:** Deploying an additional domain controller in a separate network.
+
+**Lesson learned:**
+
+- The existing domain must be reachable before promoting an additional domain controller.
+- DNS configuration must support domain discovery.
+- Inter-site connectivity is necessary for directory synchronization.
+- Domain controller promotion must be followed by service and replication validation.
+
+**Practical takeaway:** Adding a domain controller requires coordinated network, DNS, and directory services configuration.
+
+### 7.4 Active Directory Sites and Services
+
+**Challenge:** Representing the physical network topology correctly in Active Directory.
+
+**Lesson learned:**
+
+- Active Directory sites represent network locations rather than organizational departments.
+- IP subnets must be associated with the correct site.
+- Domain controllers must be assigned to their intended sites.
+- Site links control the logical replication relationship between sites.
+
+**Practical takeaway:** Correct site and subnet mapping helps Active Directory understand the network topology and select appropriate domain controllers.
+
+### 7.5 Active Directory Replication
+
+**Challenge:** Verifying that directory changes are synchronized between domain controllers.
+
+**Lesson learned:**
+
+- Replication must be monitored rather than assumed.
+- DNS and network connectivity are important replication dependencies.
+- `repadmin` provides useful visibility into replication status.
+- A successful synchronization command should be followed by replication status verification.
+
+**Practical takeaway:** Replication health is an essential part of maintaining a multi-domain-controller environment.
+
+### 7.6 Group Policy Management
+
+**Challenge:** Applying different policy settings at domain and organizational unit levels.
+
+**Lesson learned:**
+
+- GPOs should be linked at the appropriate scope.
+- Domain-wide account policies and workstation-specific policies have different purposes.
+- `gpupdate` refreshes policy processing.
+- `gpresult` helps identify which policies are applied to a client.
+
+**Practical takeaway:** Proper OU design and GPO scope management are important for consistent centralized administration.
+
+### 7.7 Troubleshooting Methodology
+
+**Challenge:** Identifying whether a problem originates from networking, DNS, Active Directory, replication, or Group Policy.
+
+**Lesson learned:**
+
+A structured troubleshooting sequence is more effective than changing multiple configurations without identifying the source of the issue.
+
+The following diagnostic order was useful:
+
+1. Check network connectivity.
+2. Verify IP configuration and gateway settings.
+3. Validate DNS resolution.
+4. Inspect Active Directory services.
+5. Check domain controller replication.
+6. Verify SYSVOL and NETLOGON.
+7. Inspect Group Policy results.
+
+**Practical takeaway:** Troubleshooting should follow service dependencies, starting with the network and DNS before moving to higher-level directory services.
+
+---
+
+## 8. Skills Developed
+
+This project strengthened practical knowledge in Windows infrastructure administration.
+
+### 8.1 Windows Server Administration
+
+- Windows Server 2022 installation and configuration.
+- Server role installation.
+- Windows service management.
+- Server network configuration.
+- Basic infrastructure troubleshooting.
+
+### 8.2 Active Directory Administration
+
+- Forest and domain deployment.
+- Domain controller promotion.
+- DNS integration.
+- Organizational Unit design.
+- User and security group management.
+- Domain-joined workstation administration.
+
+### 8.3 Multi-Site Infrastructure
+
+- Network subnet planning.
+- Active Directory site creation.
+- Subnet-to-site mapping.
+- Site link configuration.
+- Domain controller placement.
+- Replication verification.
+
+### 8.4 Group Policy Administration
+
+- GPO creation and linking.
+- Password and account lockout policy configuration.
+- Workstation security policy configuration.
+- Client-side policy refresh and verification.
+
+### 8.5 Troubleshooting and Validation
+
+- Network connectivity diagnostics.
+- DNS troubleshooting.
+- `dcdiag` diagnostics.
+- `repadmin` replication checks.
+- SYSVOL and NETLOGON verification.
+- Group Policy result analysis.
+- Basic domain controller failure-recovery testing.
+
+### 8.6 Technical Documentation
+
+- Infrastructure documentation.
+- Network topology documentation.
+- Configuration records.
+- Validation procedures.
+- Troubleshooting reports.
+- Screenshot-based technical evidence.
+
+---
+
+## 9. Project Limitations and Future Improvements
+
+The completed project provides a functional multi-site Active Directory lab. However, several additional capabilities could be implemented in future versions.
+
+These improvements are proposed extensions and were not part of the completed implementation.
+
+| Proposed Improvement | Description | Priority |
+|---|---|---|
+| Active Directory Backup | Configure and test System State backups | High |
+| Recovery Testing | Perform a documented Active Directory restore exercise | High |
+| Additional Client Testing | Add more domain-joined workstations | Medium |
+| Branch-Site Client | Deploy a workstation in the Branch subnet | Medium |
+| Monitoring | Implement infrastructure and replication monitoring | Medium |
+| Centralized Logging | Collect and review Windows event logs centrally | Medium |
+| PowerShell Automation | Automate repetitive administrative and validation tasks | Medium |
+| Security Hardening | Expand security baselines and auditing policies | High |
+| VPN Connectivity | Replace or extend the lab routing model with site-to-site VPN connectivity | Medium |
+| Advanced Recovery | Develop and test a more comprehensive recovery strategy | High |
+
+These improvements would extend the lab toward a more complete enterprise infrastructure scenario.
+
+---
+
+## 10. Final Project Deliverables
+
+The project produced the following technical deliverables:
+
+| Deliverable | Description |
+|---|---|
+| Infrastructure Environment | Four virtual machines configured in VMware Workstation |
+| Network Configuration | HQ and Branch network addressing and routing |
+| Active Directory Forest | `adlab.test` forest and domain |
+| Domain Controllers | DC-HQ and DC-BRANCH |
+| DNS Infrastructure | AD-integrated DNS configuration |
+| Multi-Site Architecture | HQ-Site and Branch-Site |
+| Replication Configuration | Configured site link and validated replication |
+| Directory Structure | Organizational Units, users, and security groups |
+| Group Policy | Domain account policy and workstation security baseline |
+| Validation Evidence | Screenshots organized by Phase 07 test category |
+| Technical Documentation | Project overview, architecture, implementation, validation, and final summary |
+
+---
+
+## 11. Professional Project Description
+
+The following description can be used in a professional portfolio or project presentation.
+
+**Active Directory Multi-Site and Replication Infrastructure**
+
+Designed, deployed, and validated a two-site Active Directory infrastructure using Windows Server 2022 and VMware Workstation.
+
+Implemented an AD DS forest and domain with two domain controllers distributed across separate HQ and Branch networks. Configured DNS, inter-site routing, Active Directory Sites and Services, site link replication, organizational units, security groups, and centralized Group Policy management.
+
+Validated domain authentication, DNS service records, directory replication, SYSVOL and NETLOGON availability, and workstation policy application. Performed a controlled Branch domain controller outage test to verify continued HQ authentication for a previously logged-on account, followed by service restoration and replication checks.
+
+**Technologies:** Windows Server 2022, Active Directory Domain Services, DNS, Group Policy, DFSR, VMware Workstation, PowerShell, DCDIAG, REPADMIN.
+
+---
+
+## 12. Final Conclusion
+
+The Active Directory Multi-Site and Replication Infrastructure project was successfully completed.
+
+The implementation demonstrated the ability to design and deploy a distributed Windows domain environment, configure the required network and directory services, manage domain users and workstations, apply centralized security policies, and validate replication between geographically separated logical sites.
+
+The project also provided practical experience in troubleshooting infrastructure dependencies and testing a basic domain controller outage and recovery scenario.
+
+Beyond the technical configuration, the project reinforced the importance of structured planning, accurate documentation, systematic validation, and evidence-based troubleshooting.
+
+**Final Status: PROJECT COMPLETED**
+
+The lab provides a documented practical foundation in Windows Server administration, Active Directory management, DNS, Group Policy, multi-site infrastructure, and enterprise IT operations.
+
+---
+
+**End of Document — 08.5 Final Project Summary & Lessons Learned**

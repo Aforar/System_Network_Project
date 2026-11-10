@@ -1,0 +1,573 @@
+# 08.4 — Validation Results & Troubleshooting Report
+
+## 1. Document Information
+
+| Item | Details |
+|---|---|
+| Project | Active Directory Multi-Site and Replication Infrastructure |
+| Document | Validation Results & Troubleshooting Report |
+| Domain | `adlab.test` |
+| Forest | `adlab.test` |
+| Headquarters Site | `HQ-Site` |
+| Branch Site | `Branch-Site` |
+| Domain Controllers | `DC-HQ`, `DC-BRANCH` |
+| Client Workstation | `CLIENT-HQ` |
+| Operating Systems | Windows Server 2022 / Windows 11 Pro |
+| Validation Phase | Phase 07 |
+| Documentation Phase | Phase 08 |
+
+---
+
+## 2. Executive Summary
+
+This document presents the validation results for the Active Directory Multi-Site and Replication Infrastructure lab.
+
+The validation phase was designed to verify that the deployed infrastructure operates correctly across both Active Directory sites. It covered user authentication, DNS resolution, Active Directory replication, SYSVOL and NETLOGON availability, Group Policy application, and basic domain controller failure recovery.
+
+All planned validation categories were completed successfully.
+
+The tests confirmed that:
+
+- Domain users can authenticate against the Active Directory domain.
+- DNS resolves the required domain records and service records.
+- Active Directory replication operates between the two domain controllers.
+- SYSVOL and NETLOGON shares are available.
+- Group Policy settings are applied to the domain and workstation.
+- The HQ domain controller remains available when the Branch domain controller is temporarily shut down.
+- The Branch domain controller returns to service and replication is restored after restart.
+
+The results demonstrate successful operation of the implemented lab configuration. They do not constitute a production readiness assessment or a full high-availability and disaster-recovery certification.
+
+---
+
+## 3. Validation Environment
+
+The following infrastructure components were included in the validation process.
+
+| Component | Configuration | Role |
+|---|---|---|
+| DC-HQ | `192.168.10.10` | HQ Domain Controller, DNS, Global Catalog |
+| DC-BRANCH | `192.168.20.10` | Branch Domain Controller, DNS, Global Catalog |
+| CLIENT-HQ | `192.168.10.20` | Domain-joined Windows 11 workstation |
+| RTR-HQ-BRANCH | HQ: `192.168.10.254`; Branch: `192.168.20.254` | Inter-site routing |
+| HQ-Site | `192.168.10.0/24` | Headquarters Active Directory site |
+| Branch-Site | `192.168.20.0/24` | Branch Active Directory site |
+
+**Active Directory domain:** `adlab.test`
+
+**Configured site link:** `HQ-BRANCH-SiteLink`
+
+**Configured replication interval:** 15 minutes
+
+---
+
+## 4. Validation Methodology
+
+The validation process was divided into six testing categories.
+
+| Test ID | Validation Category | Main Objective |
+|---|---|---|
+| VAL-01 | Authentication | Verify domain user authentication |
+| VAL-02 | DNS | Verify domain and service-record resolution |
+| VAL-03 | Active Directory Replication | Verify directory data synchronization |
+| VAL-04 | SYSVOL and NETLOGON | Verify shared domain resources |
+| VAL-05 | Group Policy | Verify policy application on the client |
+| VAL-06 | Domain Controller Failure Recovery | Verify continued HQ authentication during a controlled Branch DC outage and recovery afterward |
+
+Each test was performed using the relevant Windows administrative tools and command-line utilities.
+
+---
+
+## 5. Detailed Validation Results
+
+### 5.1 VAL-01 — Authentication Validation
+
+**Objective**
+
+Verify that domain users can authenticate successfully and that the workstation communicates with an Active Directory domain controller.
+
+**Test accounts**
+
+| Account | Organizational Unit | Security Group |
+|---|---|---|
+| `it.admin` | `Users/IT` | `GG_IT_Support` |
+| `hr.user` | `Users/HR` | `GG_HR` |
+| `employee01` | `Users/General` | `GG_Employees` |
+
+**Validation procedure**
+
+1. Sign in to `CLIENT-HQ` using each test domain account.
+2. Verify the authenticated identity.
+3. Inspect the user's security group information.
+4. Identify the domain controller used for the logon session.
+
+**Commands used**
+
+```cmd
+whoami
+whoami /all
+echo %LOGONSERVER%
+```
+
+**Expected validation criteria**
+
+- The user successfully signs in using domain credentials.
+- `whoami` displays the correct domain identity.
+- `whoami /all` displays the user's security information.
+- `%LOGONSERVER%` identifies the domain controller handling the logon session.
+
+**Result**
+
+**PASS**
+
+All three test accounts were successfully used for authentication validation. The identity and group information were inspected, and the logon server was identified.
+
+**Evidence**
+
+`Screenshots/Phase-07/01-Authentication/`
+
+---
+
+### 5.2 VAL-02 — DNS Validation
+
+**Objective**
+
+Verify that DNS provides the name-resolution services required by Active Directory.
+
+**Validation scope**
+
+- Domain DNS resolution.
+- Domain controller host records.
+- LDAP service records.
+- Kerberos service records.
+- Active Directory DNS diagnostic checks.
+
+**Commands used**
+
+```powershell
+Resolve-DnsName adlab.test
+Resolve-DnsName DC-HQ.adlab.test
+Resolve-DnsName DC-BRANCH.adlab.test
+
+Resolve-DnsName _ldap._tcp.dc._msdcs.adlab.test -Type SRV
+Resolve-DnsName _kerberos._tcp.dc._msdcs.adlab.test -Type SRV
+
+dcdiag /test:dns /v
+```
+
+Additional DNS verification:
+
+```cmd
+nslookup adlab.test
+nslookup DC-HQ.adlab.test
+nslookup DC-BRANCH.adlab.test
+```
+
+**Expected validation criteria**
+
+- The domain name resolves successfully.
+- Both domain controllers can be resolved by hostname.
+- LDAP and Kerberos SRV records are returned.
+- DNS diagnostic tests complete successfully.
+
+**Result**
+
+**PASS**
+
+DNS validation completed successfully. The domain and domain controller records were resolved, and the required Active Directory service records were verified.
+
+**Evidence**
+
+`Screenshots/Phase-07/02-DNS/`
+
+---
+
+### 5.3 VAL-03 — Active Directory Replication Validation
+
+**Objective**
+
+Verify that directory changes are replicated between `DC-HQ` and `DC-BRANCH`.
+
+**Validation procedure**
+
+1. Inspect the replication summary.
+2. Review inbound replication status.
+3. Trigger synchronization between domain controllers.
+4. Create a temporary test user on the HQ domain controller.
+5. Confirm that the object becomes available on the Branch domain controller.
+6. Remove the temporary test account after validation.
+
+**Commands used**
+
+```cmd
+repadmin /replsummary
+repadmin /showrepl
+repadmin /syncall /AdeP
+```
+
+**Replication test object**
+
+```text
+replication.test
+```
+
+**Expected validation criteria**
+
+- Replication partners are visible.
+- Replication operations complete successfully.
+- No replication failures are reported in the completed validation.
+- The temporary test object is replicated to the other domain controller.
+
+**Result**
+
+**PASS**
+
+The replication checks completed successfully. The temporary test user `replication.test` was created on the HQ domain controller and confirmed on the Branch domain controller. The test object was subsequently removed.
+
+**Evidence**
+
+`Screenshots/Phase-07/03-Replication/`
+
+---
+
+### 5.4 VAL-04 — SYSVOL and NETLOGON Validation
+
+**Objective**
+
+Verify that the domain controllers provide the shared resources required for Group Policy processing and domain logon operations.
+
+**Validation scope**
+
+- SYSVOL share availability.
+- NETLOGON share availability.
+- DFS Replication service status.
+- SYSVOL readiness.
+- Domain controller advertising checks.
+- DFSR migration state.
+
+**Commands used**
+
+```cmd
+net share
+```
+
+```powershell
+Get-Service DFSR
+```
+
+```cmd
+dcdiag /test:sysvolcheck
+dcdiag /test:advertising
+dfsrmig /getglobalstate
+```
+
+**Expected validation criteria**
+
+- SYSVOL is shared.
+- NETLOGON is shared.
+- DFS Replication service is running.
+- SYSVOL readiness checks succeed.
+- The domain controller passes the advertising check.
+- DFSR migration state is `Eliminated`.
+
+**Result**
+
+**PASS**
+
+Both domain controllers provided the SYSVOL and NETLOGON shares. DFS Replication was running, and the completed validation confirmed the expected SYSVOL and domain controller status.
+
+The DFSR migration state was confirmed as:
+
+```text
+Eliminated
+```
+
+**Evidence**
+
+`Screenshots/Phase-07/04-SYSVOL-NETLOGON/`
+
+---
+
+### 5.5 VAL-05 — Group Policy Validation
+
+**Objective**
+
+Verify that the configured domain and workstation Group Policy settings are applied to the appropriate Active Directory objects.
+
+**Policies included**
+
+| GPO | Linked Location | Purpose |
+|---|---|---|
+| `GPO-Domain-Account-Policy` | Domain root | Password and account lockout policies |
+| `GPO-Workstation-Security-Baseline` | Workstations OU | Workstation security settings |
+
+**Domain account policy settings**
+
+| Policy | Configured Value |
+|---|---|
+| Enforce password history | 10 passwords |
+| Maximum password age | 90 days |
+| Minimum password age | 1 day |
+| Minimum password length | 12 characters |
+| Password complexity | Enabled |
+| Reversible encryption | Disabled |
+| Account lockout threshold | 5 invalid attempts |
+| Account lockout duration | 15 minutes |
+| Reset account lockout counter after | 15 minutes |
+
+**Workstation security baseline**
+
+| Setting | Configured Value |
+|---|---|
+| Interactive logon title | `AUTHORIZED ACCESS ONLY` |
+| Interactive logon message | `This system is restricted to authorized users. All activities may be monitored.` |
+| Screen saver | Enabled |
+| Password protection | Enabled |
+| Screen saver timeout | 600 seconds |
+| Turn off Microsoft Defender Antivirus policy | Disabled |
+| Windows Defender Firewall — Domain profile | Enabled |
+| Windows Defender Firewall — Private profile | Enabled |
+| Windows Defender Firewall — Public profile | Enabled |
+
+**Validation procedure**
+
+1. Refresh Group Policy on the client.
+2. Review the applied Group Policy results.
+3. Generate an HTML Group Policy report.
+4. Inspect the interactive logon message.
+5. Verify the configured workstation security settings.
+
+**Commands used**
+
+```cmd
+gpupdate /force
+gpresult /r
+gpresult /h C:\gp-report.html
+```
+
+**Expected validation criteria**
+
+- Group Policy refresh completes successfully.
+- The expected GPOs appear in the resulting policy information.
+- The configured logon message is displayed.
+- The workstation security settings are reflected in the policy results.
+
+**Result**
+
+**PASS**
+
+The Group Policy validation was completed successfully. The domain account policy and workstation security baseline were reviewed, and the client-side policy application was verified.
+
+**Evidence**
+
+`Screenshots/Phase-07/05-Group-Policy/`
+
+---
+
+### 5.6 VAL-06 — Domain Controller Failure Recovery
+
+**Objective**
+
+Evaluate the domain's ability to continue providing authentication services through the HQ domain controller while the Branch domain controller is temporarily unavailable.
+
+This test also verifies that the Branch domain controller can return to service after restart.
+
+**Test scenario**
+
+The Branch domain controller was intentionally shut down to simulate a temporary domain controller outage.
+
+**Test procedure**
+
+1. Confirm that both domain controllers are operating normally.
+2. Shut down `DC-BRANCH`.
+3. Keep `DC-HQ` running.
+4. Test domain authentication from `CLIENT-HQ`.
+5. Inspect the logon server to identify the domain controller handling authentication.
+6. Restart `DC-BRANCH`.
+7. Verify that the Branch domain controller services return to the running state.
+8. Confirm that replication and shared domain resources are available again.
+
+**Commands used**
+
+```cmd
+echo %LOGONSERVER%
+```
+
+On the domain controller:
+
+```powershell
+Get-Service NTDS,DNS,Netlogon,DFSR,KDC
+```
+
+Replication verification:
+
+```cmd
+repadmin /replsummary
+repadmin /showrepl
+```
+
+SYSVOL verification:
+
+```cmd
+net share
+```
+
+**Expected validation criteria**
+
+- `DC-HQ` remains operational during the Branch outage.
+- The client can authenticate through the available HQ domain controller.
+- The logon server identifies `DC-HQ`.
+- `DC-BRANCH` returns to service after restart.
+- Required domain controller services are running.
+- Replication and SYSVOL/NETLOGON availability are restored.
+
+**Result**
+
+**PASS**
+
+The controlled failure-recovery test completed successfully.
+
+During the temporary shutdown of `DC-BRANCH`, `DC-HQ` remained available. The client successfully completed the authentication test using a previously logged-on account, and the logon server information confirmed `DC-HQ`.
+
+After restarting `DC-BRANCH`, its required services returned to the running state. Replication and SYSVOL/NETLOGON availability were verified again.
+
+**Important limitation**
+
+The authentication test used a previously logged-on account. Therefore, this test demonstrates continued authentication availability for that tested account under the lab conditions; it does not independently prove that every user can perform a first-time domain logon during a domain controller outage.
+
+This controlled test also does not establish full production high availability, disaster recovery, or site-level fault tolerance.
+
+**Evidence**
+
+`Screenshots/Phase-07/06-DC-Failure-Recovery/`
+
+---
+
+## 6. Consolidated Validation Results
+
+The following table summarizes the results of the Phase 07 validation activities.
+
+| Test ID | Validation Area | Result | Evidence |
+|---|---|---|---|
+| VAL-01 | User Authentication | PASS | Authentication screenshots |
+| VAL-02 | DNS Resolution | PASS | DNS screenshots |
+| VAL-03 | Active Directory Replication | PASS | Replication screenshots |
+| VAL-04 | SYSVOL and NETLOGON | PASS | SYSVOL/NETLOGON screenshots |
+| VAL-05 | Group Policy Application | PASS | Group Policy screenshots |
+| VAL-06 | Domain Controller Failure Recovery | PASS | Failure recovery screenshots |
+
+**Overall validation status: PASSED**
+
+All six planned validation categories were completed successfully according to the recorded lab results.
+
+---
+
+## 7. Troubleshooting and Issue Resolution
+
+The implementation and validation process included configuration checks and troubleshooting activities.
+
+The following table records the relevant issues and corrective actions encountered during the project.
+
+| Area | Issue or Observation | Corrective Action / Resolution |
+|---|---|---|
+| Network Configuration | Initial IP address conflict involving the HQ network configuration | Corrected the router/network addressing configuration and used `192.168.10.254` as the HQ gateway |
+| Domain Controller DNS | DNS configuration required the HQ domain controller to be available during Branch domain joining and promotion | Used the HQ DNS server during the Branch domain controller deployment process |
+| Replication | An earlier replication synchronization attempt reported a temporary topology or server reachability warning | Rechecked connectivity and replication configuration, then repeated synchronization and validation |
+| DNS and Replication | An earlier replication check reported a temporary DNS lookup failure | Revalidated DNS resolution and repeated replication checks; subsequent validation completed successfully |
+| SYSVOL / DFSR | An earlier DFS Replication diagnostic event was investigated during deployment | Continued DFSR and SYSVOL validation; the completed checks confirmed the expected SYSVOL state and successful validation |
+| Client DNS | DNS response and server identification behavior was inspected during client-side troubleshooting | Verified the required domain records and service records using DNS validation commands |
+
+The table records issues encountered during implementation and their subsequent resolution. It does not indicate that these issues remained active at the end of Phase 07.
+
+---
+
+## 8. Security Validation Summary
+
+The validation phase also reviewed the security-related configurations implemented in the lab.
+
+| Security Control | Validation Focus | Result |
+|---|---|---|
+| Domain Authentication | Domain user sign-in | Passed |
+| Password Policy | Password complexity and length settings | Passed |
+| Account Lockout | Lockout threshold and duration settings | Passed |
+| Interactive Logon | Authorized-access warning message | Passed |
+| Workstation Security | Screen saver and password protection policy configuration | Passed |
+| Microsoft Defender Policy | Configured policy state | Passed |
+| Windows Defender Firewall | Domain, Private, and Public profile policy configuration | Passed |
+| User Organization | OU and security group membership | Passed |
+
+These results confirm the configured security policies and their validation within the lab. They should not be interpreted as a complete security audit or penetration test.
+
+---
+
+## 9. Evidence Organization
+
+The screenshots collected during Phase 07 are organized using the following directory structure:
+
+```text
+Screenshots/
+└── Phase-07/
+    ├── 01-Authentication/
+    ├── 02-DNS/
+    ├── 03-Replication/
+    ├── 04-SYSVOL-NETLOGON/
+    ├── 05-Group-Policy/
+    └── 06-DC-Failure-Recovery/
+```
+
+Each directory contains supporting screenshots for its corresponding validation category.
+
+The screenshots provide visual evidence of the executed tests and their results.
+
+---
+
+## 10. Final Assessment
+
+The validation phase confirmed that the implemented Active Directory Multi-Site infrastructure operates successfully under the tested lab conditions.
+
+The two-site domain controller architecture supports directory replication between HQ and Branch. DNS provides the required domain and service-record resolution, while SYSVOL and NETLOGON remain available for domain operations.
+
+The domain-joined workstation successfully authenticated using the configured test accounts and received the intended Group Policy configurations.
+
+The controlled Branch domain controller outage test also demonstrated that the HQ domain controller remained available for the tested client authentication scenario. Following the restart of the Branch domain controller, the required services, replication, and shared resources were verified again.
+
+### Final Project Status
+
+| Area | Status |
+|---|---|
+| Network Connectivity | Completed |
+| Active Directory Domain Deployment | Completed |
+| Multi-Site Configuration | Completed |
+| DNS Configuration | Completed |
+| Active Directory Replication | Validated |
+| Client Domain Join | Completed |
+| Organizational Units and Security Groups | Completed |
+| Group Policy Configuration | Validated |
+| SYSVOL and NETLOGON | Validated |
+| Failure Recovery Scenario | Validated |
+| Documentation Evidence | Collected |
+
+**Conclusion:** Phase 07 validation is complete, and the lab successfully demonstrates a functional two-site Active Directory infrastructure with replication, centralized authentication, Group Policy management, and a basic domain controller failure-recovery scenario.
+
+---
+
+## 11. Project Limitations
+
+The results must be interpreted within the scope of the implemented lab.
+
+The following capabilities were not established by the completed tests:
+
+- Production-grade high availability.
+- Full disaster recovery and recovery-time objectives.
+- Automated failover between sites.
+- Backup and restore validation for Active Directory.
+- Security penetration testing.
+- Continuous monitoring and alerting.
+- Multi-client authentication testing during every possible failure scenario.
+- Production WAN connectivity and VPN-based site-to-site communication.
+
+These capabilities are outside the validated scope of this project.
+
+---
+
+**End of Document — 08.4 Validation Results & Troubleshooting Report**

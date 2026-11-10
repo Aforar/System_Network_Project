@@ -1,0 +1,422 @@
+# Phase 08.1 — Project Overview & Requirements
+
+## 1. Project Information
+
+**Project Title:** Active Directory Multi-Site and Replication Infrastructure
+
+**Project Type:** Enterprise IT Infrastructure / Systems Administration / Identity and Access Management
+
+**Project Environment:** Virtualized Lab Environment
+
+**Operating Systems:**
+- Windows Server 2022
+- Windows 11 Pro
+
+**Active Directory Domain:** `adlab.test`
+
+**NetBIOS Domain Name:** `ADLAB`
+
+**Architecture:** Two-site Active Directory environment consisting of a Headquarters (HQ) site and a Branch site, connected through a routed network.
+
+---
+
+## 2. Project Overview
+
+This project focuses on designing, deploying, configuring, and validating a multi-site Microsoft Active Directory infrastructure using Windows Server 2022.
+
+The infrastructure represents a simplified enterprise environment with two geographically separated network locations: a Headquarters (HQ) site and a Branch site.
+
+Each site hosts a dedicated Domain Controller responsible for providing centralized identity management, authentication, DNS services, and Active Directory directory services.
+
+The two sites are connected through a Windows Server-based routing infrastructure, allowing communication and Active Directory replication between their respective subnets.
+
+The project also implements Active Directory Sites and Services, organizational units (OUs), security groups, test user accounts, Group Policy Objects (GPOs), and a Windows 11 domain-joined workstation.
+
+Finally, the infrastructure is subjected to functional validation and failure-recovery tests to verify authentication, DNS resolution, directory replication, SYSVOL availability, Group Policy application, and service continuity during a simulated Branch Domain Controller outage.
+
+The project demonstrates practical skills in Windows Server administration, Active Directory Domain Services (AD DS), DNS, network routing, Group Policy management, directory replication, and infrastructure troubleshooting.
+
+---
+
+## 3. Project Objectives
+
+The main objectives of this project are:
+
+1. Design a multi-site enterprise network architecture.
+2. Deploy a new Active Directory forest and domain.
+3. Configure two Windows Server 2022 Domain Controllers.
+4. Implement DNS services and Active Directory-integrated DNS zones.
+5. Establish network connectivity between HQ and Branch sites.
+6. Configure Active Directory Sites and Services.
+7. Associate IP subnets with their corresponding AD sites.
+8. Configure an inter-site replication topology.
+9. Organize directory objects using Organizational Units.
+10. Create security groups and test user accounts.
+11. Join a Windows 11 workstation to the Active Directory domain.
+12. Implement domain-level account security policies.
+13. Deploy workstation security settings through Group Policy.
+14. Validate Active Directory authentication and DNS resolution.
+15. Verify replication between Domain Controllers.
+16. Validate SYSVOL and NETLOGON availability.
+17. Verify Group Policy application on the domain workstation.
+18. Simulate a Branch Domain Controller outage and validate recovery.
+
+---
+
+## 4. Project Scope
+
+### 4.1 Included Components
+
+The project covers the following infrastructure components:
+
+| Component | Scope |
+|---|---|
+| Active Directory Domain Services | Forest and domain deployment |
+| Domain Controllers | Two Windows Server 2022 Domain Controllers |
+| DNS | DNS Server role and AD-integrated DNS zones |
+| Network Routing | Inter-site routing using Windows Server |
+| Active Directory Sites | HQ-Site and Branch-Site |
+| AD Subnets | HQ and Branch subnet mapping |
+| Site Link | Inter-site replication configuration |
+| Directory Structure | Organizational Units and containers |
+| Security Groups | Global Security Groups |
+| User Management | Test user account creation and membership |
+| Client Integration | Windows 11 domain join |
+| Group Policy | Domain account and workstation security policies |
+| Replication | Active Directory and SYSVOL replication validation |
+| Resilience Testing | Branch Domain Controller failure and recovery |
+
+### 4.2 Out of Scope
+
+The following capabilities are not part of this implementation:
+
+- Production deployment on physical servers.
+- Publicly accessible production domain services.
+- Microsoft Entra ID integration.
+- Hybrid identity synchronization.
+- Active Directory Certificate Services (AD CS).
+- DHCP server deployment.
+- Multi-factor authentication implementation.
+- Enterprise backup and disaster recovery infrastructure.
+- SIEM or centralized security monitoring integration.
+- Automated configuration management.
+- Additional branch locations or additional client workstations.
+
+These capabilities may be considered in future infrastructure enhancements.
+
+---
+
+## 5. Infrastructure Architecture
+
+The infrastructure consists of four virtual machines:
+
+| Hostname | Operating System | Role | IP Address |
+|---|---|---|---|
+| DC-HQ | Windows Server 2022 | HQ Domain Controller and DNS Server | 192.168.10.10 |
+| DC-BRANCH | Windows Server 2022 | Branch Domain Controller and DNS Server | 192.168.20.10 |
+| CLIENT-HQ | Windows 11 Pro | Domain-joined workstation | 192.168.10.20 |
+| RTR-HQ-BRANCH | Windows Server 2022 | Inter-site network router | Two network interfaces |
+
+Both Domain Controllers provide Active Directory Domain Services and DNS services. Both are configured as Global Catalog servers.
+
+### 5.1 Active Directory Domain Information
+
+| Setting | Configuration |
+|---|---|
+| Forest Name | adlab.test |
+| Domain Name | adlab.test |
+| NetBIOS Name | ADLAB |
+| Forest Functional Level | Windows Server 2016 |
+| Domain Controller Operating System | Windows Server 2022 |
+| Global Catalog | Enabled on both Domain Controllers |
+| DNS Integration | Active Directory-integrated zones |
+
+### 5.2 Network Architecture
+
+The lab uses two isolated VMware host-only networks connected through the Windows Server routing VM.
+
+**Headquarters Network:**
+- Network ID: `192.168.10.0/24`
+- Gateway: `192.168.10.254`
+- Domain Controller: `192.168.10.10`
+- Client Workstation: `192.168.10.20`
+
+**Branch Network:**
+- Network ID: `192.168.20.0/24`
+- Gateway: `192.168.20.254`
+- Domain Controller: `192.168.20.10`
+
+**Routing Infrastructure:**
+
+The `RTR-HQ-BRANCH` virtual machine provides inter-subnet routing through two network interfaces:
+
+| Interface | IP Address | Connected Network |
+|---|---|---|
+| Ethernet0 | 192.168.10.254 | HQ |
+| Ethernet1 | 192.168.20.254 | Branch |
+
+The routing configuration enables communication between the two sites.
+
+### 5.3 Active Directory Sites and Services
+
+Two Active Directory sites are configured:
+
+| Site Name | Associated Subnet | Domain Controller |
+|---|---|---|
+| HQ-Site | 192.168.10.0/24 | DC-HQ |
+| Branch-Site | 192.168.20.0/24 | DC-BRANCH |
+
+The default site link was configured as follows:
+
+| Setting | Value |
+|---|---|
+| Site Link Name | HQ-BRANCH-SiteLink |
+| Connected Sites | HQ-Site, Branch-Site |
+| Cost | 100 |
+| Replication Interval | 15 minutes |
+
+The configuration allows Active Directory to associate clients and Domain Controllers with the correct site based on their IP subnet.
+
+---
+
+## 6. Active Directory Logical Structure
+
+A structured Organizational Unit hierarchy is implemented to organize directory objects and support administrative delegation and Group Policy management.
+
+```text
+adlab.test
+│
+└── ADLAB
+    │
+    ├── Users
+    │   ├── IT
+    │   ├── HR
+    │   └── General
+    │
+    ├── Groups
+    │
+    └── Computers
+        ├── Workstations
+        └── Servers
+```
+
+### 6.1 Security Groups
+
+The following Global Security Groups are configured:
+
+| Group Name | Group Scope | Group Type | Purpose |
+|---|---|---|---|
+| GG_IT_Support | Global | Security | IT support test membership |
+| GG_HR | Global | Security | HR department test membership |
+| GG_Employees | Global | Security | General employee test membership |
+
+### 6.2 Test User Accounts
+
+The following test accounts are created:
+
+| Display Name | Username | Organizational Unit | Security Group |
+|---|---|---|---|
+| IT Administrator | it.admin | Users/IT | GG_IT_Support |
+| HR User | hr.user | Users/HR | GG_HR |
+| Standard User | employee01 | Users/General | GG_Employees |
+
+These accounts are used to validate domain authentication, user management, and security group membership.
+
+The `it.admin` account represents an IT support test account and is not automatically granted Domain Admin privileges.
+
+---
+
+## 7. Group Policy Configuration
+
+Two Group Policy Objects are implemented to demonstrate centralized security configuration.
+
+### 7.1 GPO-Domain-Account-Policy
+
+**Link Location:** Active Directory domain root (`adlab.test`).
+
+This GPO configures domain account password and account lockout policies.
+
+**Password Policy:**
+
+| Policy | Configured Value |
+|---|---|
+| Enforce Password History | 10 passwords |
+| Maximum Password Age | 90 days |
+| Minimum Password Age | 1 day |
+| Minimum Password Length | 12 characters |
+| Password Complexity | Enabled |
+| Store Passwords Using Reversible Encryption | Disabled |
+
+**Account Lockout Policy:**
+
+| Policy | Configured Value |
+|---|---|
+| Account Lockout Threshold | 5 invalid attempts |
+| Account Lockout Duration | 15 minutes |
+| Reset Account Lockout Counter After | 15 minutes |
+
+These values are used for the lab implementation and are not presented as universal production security recommendations.
+
+### 7.2 GPO-Workstation-Security-Baseline
+
+**Link Location:** `ADLAB\Computers\Workstations`.
+
+This GPO applies workstation security settings to computers located in the Workstations OU.
+
+**Interactive Logon Message:**
+
+| Setting | Value |
+|---|---|
+| Message Title | AUTHORIZED ACCESS ONLY |
+| Message Text | This system is restricted to authorized users. All activities may be monitored. |
+
+**Screen Saver and Lock Configuration:**
+
+| Setting | Value |
+|---|---|
+| Enable Screen Saver | Enabled |
+| Password Protect Screen Saver | Enabled |
+| Screen Saver Timeout | 600 seconds |
+
+**Microsoft Defender Antivirus:**
+
+The policy `Turn off Microsoft Defender Antivirus` is configured as Disabled, meaning the policy does not instruct Windows to turn off Microsoft Defender Antivirus.
+
+**Windows Defender Firewall:**
+
+Windows Defender Firewall is configured to remain enabled for the applicable Domain, Private, and Public network profiles.
+
+---
+
+## 8. Technical Requirements
+
+### 8.1 Virtualization Platform
+
+- VMware Workstation.
+- Virtual machine networking using host-only virtual networks.
+- Virtual machines configured with static IPv4 addressing.
+- Sufficient host resources to operate the lab environment.
+
+### 8.2 Server Requirements
+
+| Requirement | Configuration |
+|---|---|
+| Server Operating System | Windows Server 2022 |
+| Domain Controllers | 2 |
+| Routing Server | 1 |
+| Active Directory Role | AD DS |
+| DNS Role | DNS Server |
+| Directory Replication | Active Directory replication |
+| SYSVOL Replication | DFS Replication (DFSR) |
+
+### 8.3 Client Requirements
+
+| Requirement | Configuration |
+|---|---|
+| Operating System | Windows 11 Pro |
+| Domain Membership | adlab.test |
+| IPv4 Address | 192.168.10.20 |
+| DNS Server | 192.168.10.10 |
+| Computer OU | ADLAB/Computers/Workstations |
+
+### 8.4 Administrative Tools
+
+The following tools and commands are used for administration and validation:
+
+- Active Directory Users and Computers (ADUC).
+- Active Directory Sites and Services.
+- DNS Manager.
+- Group Policy Management Console (GPMC).
+- Server Manager.
+- Windows PowerShell.
+- Command Prompt.
+- `dcdiag`
+- `repadmin`
+- `nltest`
+- `nslookup`
+- `gpresult`
+- `gpupdate`
+- `Get-ADDomainController`
+- `Get-ADReplicationPartnerMetadata`
+
+---
+
+## 9. Security and Operational Considerations
+
+The lab implements several foundational security and operational practices:
+
+1. Centralized identity management through Active Directory.
+2. Logical separation of user accounts, groups, workstations, and servers.
+3. Security group-based user organization.
+4. Domain account password and lockout policies.
+5. Centralized workstation security configuration through GPO.
+6. Windows Defender Antivirus policy configuration.
+7. Windows Defender Firewall profile enforcement.
+8. Separation of HQ and Branch network subnets.
+9. Site-aware Active Directory replication.
+10. Validation of directory services and recovery following a simulated Domain Controller outage.
+
+All tests are performed within an isolated virtual lab environment.
+
+---
+
+## 10. Project Deliverables
+
+The project produces the following technical and evidential deliverables:
+
+| Deliverable | Description |
+|---|---|
+| Virtual Infrastructure | Four configured virtual machines |
+| Network Configuration | HQ and Branch network configuration |
+| Active Directory Forest | adlab.test forest and domain |
+| Domain Controllers | DC-HQ and DC-BRANCH |
+| DNS Infrastructure | Active Directory-integrated DNS configuration |
+| Routing Configuration | Inter-site connectivity |
+| AD Sites and Services | Two sites, two subnets, and configured site link |
+| Directory Structure | OUs, users, and security groups |
+| Group Policy | Domain account and workstation security GPOs |
+| Domain Client | Windows 11 domain-joined workstation |
+| Validation Evidence | Authentication, DNS, replication, SYSVOL, and GPO tests |
+| Recovery Evidence | Branch Domain Controller failure and recovery tests |
+| Technical Documentation | Implementation and validation documentation |
+| Screenshots | Organized evidence covering project phases |
+
+---
+
+## 11. Expected Project Outcomes
+
+At the end of the implementation, the infrastructure is expected to demonstrate:
+
+- A functional Active Directory forest and domain.
+- Two operational Domain Controllers distributed across two sites.
+- DNS name resolution for domain resources and Domain Controllers.
+- Successful inter-site network communication.
+- Correct Active Directory site and subnet association.
+- Successful directory replication between both Domain Controllers.
+- Available SYSVOL and NETLOGON shares.
+- Successful domain authentication from the Windows 11 workstation.
+- Successful application of the intended Group Policy settings.
+- Continued HQ-side domain service availability during the simulated Branch Domain Controller outage.
+- Successful Branch Domain Controller recovery and replication restoration.
+
+The completed lab provides practical evidence of the ability to deploy, administer, validate, and troubleshoot a multi-site Windows Server Active Directory infrastructure.
+
+---
+
+## 12. Project Limitations
+
+This implementation is a controlled virtual lab designed for technical learning and professional portfolio demonstration.
+
+It does not represent a production-ready enterprise deployment. The environment uses a limited number of virtual machines, one client workstation, and a simplified two-site network topology.
+
+The failure-recovery exercise validates selected service availability and recovery scenarios. It does not constitute a full disaster recovery, business continuity, or production high-availability assessment.
+
+Any production implementation would require additional design considerations, including backup and restore procedures, security hardening, monitoring, capacity planning, privileged access management, and formal disaster recovery requirements.
+
+---
+
+**Document:** Phase 08.1 — Project Overview & Requirements  
+**Project:** Active Directory Multi-Site and Replication Infrastructure  
+**Domain:** adlab.test  
+**Environment:** VMware Workstation / Windows Server 2022 / Windows 11 Pro  
+**Status:** Implementation and validation completed; portfolio documentation in progress.

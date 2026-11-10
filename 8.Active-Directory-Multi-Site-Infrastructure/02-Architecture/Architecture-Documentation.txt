@@ -1,0 +1,473 @@
+# Phase 08.2 — Architecture & Network Topology
+
+## 1. Architecture Overview
+
+The Active Directory Multi-Site and Replication Infrastructure is designed around a two-site enterprise network architecture.
+
+The environment consists of:
+
+- A Headquarters (HQ) site.
+- A Branch site.
+- One Active Directory Domain Controller at each site.
+- A Windows Server-based router connecting both network segments.
+- A Windows 11 Pro domain-joined workstation located at HQ.
+
+Both sites belong to the same Active Directory forest and domain:
+
+- **Forest:** `adlab.test`
+- **Domain:** `adlab.test`
+- **NetBIOS:** `ADLAB`
+
+Each site has its own IP subnet and Domain Controller. The routing infrastructure provides communication between the two subnets, while Active Directory Sites and Services defines the logical site boundaries and replication relationship.
+
+The architecture separates the network infrastructure into three principal layers:
+
+1. Network and Routing Layer.
+2. Active Directory and DNS Layer.
+3. Client and Identity Management Layer.
+
+---
+
+## 2. High-Level Infrastructure Architecture
+
+The following diagram represents the overall infrastructure and the relationship between the two sites.
+
+```mermaid
+flowchart TB
+    subgraph HQ["HEADQUARTERS — HQ-Site"]
+        HQDC["DC-HQ<br/>Windows Server 2022<br/>AD DS + DNS + Global Catalog<br/>192.168.10.10"]
+        CLIENT["CLIENT-HQ<br/>Windows 11 Pro<br/>192.168.10.20"]
+        HQSW["VMnet2<br/>192.168.10.0/24"]
+        HQDC --- HQSW
+        CLIENT --- HQSW
+    end
+
+    subgraph ROUTING["INTER-SITE ROUTING"]
+        ROUTER["RTR-HQ-BRANCH<br/>Windows Server 2022<br/>Routing Infrastructure"]
+    end
+
+    subgraph BRANCH["BRANCH — Branch-Site"]
+        BRANCHSW["VMnet3<br/>192.168.20.0/24"]
+        BRANCHDC["DC-BRANCH<br/>Windows Server 2022<br/>AD DS + DNS + Global Catalog<br/>192.168.20.10"]
+        BRANCHSW --- BRANCHDC
+    end
+
+    HQSW ---|"192.168.10.254"| ROUTER
+    ROUTER ---|"192.168.20.254"| BRANCHSW
+
+    HQDC <-->|"AD Replication"| BRANCHDC
+```
+
+**Architecture Explanation:**
+
+- DC-HQ provides Active Directory Domain Services and DNS for the HQ site.
+- DC-BRANCH provides Active Directory Domain Services and DNS for the Branch site.
+- CLIENT-HQ is joined to the `adlab.test` domain.
+- RTR-HQ-BRANCH routes traffic between the HQ and Branch subnets.
+- Both Domain Controllers operate within the same Active Directory domain.
+- Active Directory replication synchronizes directory information between the two Domain Controllers.
+
+---
+
+## 3. Physical and Virtual Infrastructure Design
+
+The infrastructure is deployed using VMware Workstation.
+
+Four virtual machines are used to build the complete environment.
+
+### 3.1 Virtual Machine Inventory
+
+| Virtual Machine | Operating System | Primary Role |
+|---|---|---|
+| DC-HQ | Windows Server 2022 | Headquarters Domain Controller |
+| DC-BRANCH | Windows Server 2022 | Branch Domain Controller |
+| CLIENT-HQ | Windows 11 Pro | Domain-joined workstation |
+| RTR-HQ-BRANCH | Windows Server 2022 | Inter-site router |
+
+### 3.2 Virtual Network Design
+
+Two VMware host-only networks provide isolated network segments.
+
+| VMware Network | Network Type | Network Address | Purpose |
+|---|---|---|---|
+| VMnet2 | Host-only | 192.168.10.0/24 | Headquarters network |
+| VMnet3 | Host-only | 192.168.20.0/24 | Branch network |
+
+The two virtual networks are connected through the routing virtual machine.
+
+The host-only configuration provides an isolated environment for implementing and testing the infrastructure without requiring the lab networks to be exposed to an external production network.
+
+---
+
+## 4. Network Topology
+
+### 4.1 Headquarters Network
+
+The Headquarters site uses the subnet:
+
+`192.168.10.0/24`
+
+| Device | IP Address | Subnet Mask | Default Gateway | DNS |
+|---|---|---|---|---|
+| DC-HQ | 192.168.10.10 | 255.255.255.0 | 192.168.10.254 | 192.168.10.10 |
+| CLIENT-HQ | 192.168.10.20 | 255.255.255.0 | 192.168.10.254 | 192.168.10.10 |
+| RTR-HQ-BRANCH | 192.168.10.254 | 255.255.255.0 | — | — |
+
+**Network Characteristics:**
+
+- Network ID: `192.168.10.0/24`
+- Default Gateway: `192.168.10.254`
+- Domain Controller: `DC-HQ`
+- DNS Server: `DC-HQ`
+- VMware Network: `VMnet2`
+
+### 4.2 Branch Network
+
+The Branch site uses the subnet:
+
+`192.168.20.0/24`
+
+| Device | IP Address | Subnet Mask | Default Gateway | DNS |
+|---|---|---|---|---|
+| DC-BRANCH | 192.168.20.10 | 255.255.255.0 | 192.168.20.254 | 192.168.10.10 |
+| RTR-HQ-BRANCH | 192.168.20.254 | 255.255.255.0 | — | — |
+
+**Network Characteristics:**
+
+- Network ID: `192.168.20.0/24`
+- Default Gateway: `192.168.20.254`
+- Domain Controller: `DC-BRANCH`
+- VMware Network: `VMnet3`
+
+The Branch Domain Controller uses the HQ Domain Controller as its configured DNS server in the original network configuration. This allows it to resolve the Active Directory domain and locate the existing Domain Controller during deployment.
+
+### 4.3 Inter-Site Routing
+
+The `RTR-HQ-BRANCH` virtual machine connects both network segments through two network interfaces.
+
+| Router Interface | IP Address | Connected Network |
+|---|---|---|
+| Ethernet0 | 192.168.10.254/24 | HQ |
+| Ethernet1 | 192.168.20.254/24 | Branch |
+
+The router forwards traffic between:
+
+- `192.168.10.0/24`
+- `192.168.20.0/24`
+
+This routing configuration enables communication between the Domain Controllers and supports inter-site Active Directory operations.
+
+---
+
+## 5. Active Directory Logical Architecture
+
+### 5.1 Forest and Domain Structure
+
+The project implements a single Active Directory forest containing one domain.
+
+```mermaid
+flowchart TB
+    FOREST["Active Directory Forest<br/>adlab.test"]
+    DOMAIN["Active Directory Domain<br/>adlab.test<br/>NetBIOS: ADLAB"]
+    DC1["DC-HQ<br/>HQ-Site<br/>Global Catalog"]
+    DC2["DC-BRANCH<br/>Branch-Site<br/>Global Catalog"]
+
+    FOREST --> DOMAIN
+    DOMAIN --> DC1
+    DOMAIN --> DC2
+```
+
+Both Domain Controllers belong to the same domain and maintain directory information through Active Directory replication.
+
+### 5.2 Domain Controller Roles
+
+| Feature | DC-HQ | DC-BRANCH |
+|---|---|---|
+| Operating System | Windows Server 2022 | Windows Server 2022 |
+| AD DS | Installed | Installed |
+| DNS Server | Installed | Installed |
+| Global Catalog | Enabled | Enabled |
+| Active Directory Site | HQ-Site | Branch-Site |
+| IPv4 Address | 192.168.10.10 | 192.168.20.10 |
+| Domain | adlab.test | adlab.test |
+
+Both servers are writable Domain Controllers in the same domain.
+
+The Global Catalog role is enabled on both servers to support directory searches and related Active Directory operations.
+
+---
+
+## 6. Active Directory Sites and Services Architecture
+
+Active Directory Sites and Services is configured to represent the two network locations logically.
+
+### 6.1 Site Configuration
+
+| Site | Associated Subnet | Domain Controller |
+|---|---|---|
+| HQ-Site | 192.168.10.0/24 | DC-HQ |
+| Branch-Site | 192.168.20.0/24 | DC-BRANCH |
+
+The IP subnet associations allow Active Directory clients and servers to identify their corresponding site.
+
+### 6.2 Site Link Configuration
+
+The inter-site replication link is configured as follows:
+
+| Property | Configuration |
+|---|---|
+| Site Link Name | HQ-BRANCH-SiteLink |
+| Connected Sites | HQ-Site, Branch-Site |
+| Cost | 100 |
+| Replication Interval | 15 minutes |
+
+The site link defines the logical connection between the two Active Directory sites.
+
+The replication interval specifies the configured interval at which the site link can be used for scheduled inter-site replication. It should not be interpreted as a guarantee that every directory change will replicate within exactly 15 minutes.
+
+### 6.3 Site Architecture Diagram
+
+```mermaid
+flowchart TB
+    subgraph SITE1["HQ-Site"]
+        SUB1["192.168.10.0/24"]
+        DC1["DC-HQ"]
+        SUB1 --- DC1
+    end
+
+    LINK["HQ-BRANCH-SiteLink<br/>Cost: 100<br/>Interval: 15 minutes"]
+
+    subgraph SITE2["Branch-Site"]
+        SUB2["192.168.20.0/24"]
+        DC2["DC-BRANCH"]
+        SUB2 --- DC2
+    end
+
+    SITE1 <-->|"Inter-Site Replication"| LINK
+    LINK <-->|"Inter-Site Replication"| SITE2
+```
+
+---
+
+## 7. DNS Architecture
+
+DNS is integrated with Active Directory to support domain discovery, authentication, and directory service location.
+
+Both Domain Controllers have the DNS Server role installed.
+
+### 7.1 DNS Configuration
+
+| DNS Component | Configuration |
+|---|---|
+| Primary Domain | adlab.test |
+| Forest DNS Zone | _msdcs.adlab.test |
+| DNS Server at HQ | 192.168.10.10 |
+| DNS Server at Branch | 192.168.20.10 |
+| DNS Integration | Active Directory-integrated |
+| Domain Controller Discovery | DNS SRV records |
+
+The Active Directory-integrated DNS zones are replicated through the directory replication mechanism according to their configured replication scope.
+
+### 7.2 DNS Resolution Flow
+
+A domain-joined workstation uses DNS to locate Active Directory services.
+
+```mermaid
+sequenceDiagram
+    participant C as CLIENT-HQ
+    participant DNS as DC-HQ DNS
+    participant AD as Active Directory
+
+    C->>DNS: Query domain / DC SRV records
+    DNS-->>C: Return DNS records
+    C->>AD: Locate and contact Domain Controller
+    AD-->>C: Authentication and directory services
+```
+
+DNS SRV records allow clients to discover services such as LDAP and Kerberos on available Domain Controllers.
+
+---
+
+## 8. Active Directory Replication Architecture
+
+Active Directory replication keeps directory information synchronized between the Domain Controllers.
+
+The project uses two writable Domain Controllers located in separate Active Directory sites.
+
+### 8.1 Replication Scope
+
+The replication validation covers the following naming contexts:
+
+| Naming Context | Purpose |
+|---|---|
+| Domain | Domain directory objects |
+| Configuration | Forest-wide configuration data |
+| Schema | Active Directory schema |
+| DomainDnsZones | Domain DNS application partition |
+| ForestDnsZones | Forest DNS application partition |
+
+### 8.2 Replication Flow
+
+```mermaid
+flowchart LR
+    HQ["DC-HQ<br/>HQ-Site"]
+    BRANCH["DC-BRANCH<br/>Branch-Site"]
+
+    HQ <-->|"Active Directory Replication"| BRANCH
+```
+
+The replication topology is managed by Active Directory. The configured site link provides the logical connection between the two sites.
+
+### 8.3 SYSVOL Replication
+
+SYSVOL contains domain-related files used by Group Policy and other domain operations.
+
+The project uses DFS Replication (DFSR) for SYSVOL replication.
+
+Both Domain Controllers provide:
+
+- SYSVOL share.
+- NETLOGON share.
+
+These shares are validated to confirm their availability and accessibility.
+
+---
+
+## 9. Client and Group Policy Architecture
+
+The Windows 11 workstation is joined to the `adlab.test` domain and placed in the designated Workstations OU.
+
+### 9.1 Organizational Unit Structure
+
+```text
+adlab.test
+└── ADLAB
+    ├── Users
+    │   ├── IT
+    │   ├── HR
+    │   └── General
+    ├── Groups
+    └── Computers
+        ├── Workstations
+        └── Servers
+```
+
+### 9.2 Group Policy Structure
+
+Two GPOs are deployed:
+
+| GPO | Link Location | Main Purpose |
+|---|---|---|
+| GPO-Domain-Account-Policy | Domain root | Password and account lockout policies |
+| GPO-Workstation-Security-Baseline | Workstations OU | Workstation security settings |
+
+The domain account policy is linked at the domain level because password and account lockout policies for domain accounts are domain-scoped.
+
+The workstation security baseline is linked to the Workstations OU to target the relevant computer accounts.
+
+### 9.3 Policy Application Flow
+
+```mermaid
+flowchart TB
+    DOMAIN["adlab.test"]
+    DOMAINGPO["GPO-Domain-Account-Policy"]
+    ADLAB["ADLAB"]
+    COMPUTERS["Computers"]
+    WORKSTATIONS["Workstations"]
+    CLIENT["CLIENT-HQ"]
+
+    DOMAIN --> DOMAINGPO
+    DOMAIN --> ADLAB
+    ADLAB --> COMPUTERS
+    COMPUTERS --> WORKSTATIONS
+    WORKSTATIONS --> CLIENT
+    WORKSTATIONS -.->|"Linked GPO"| BASELINE["GPO-Workstation-Security-Baseline"]
+```
+
+The effective Group Policy settings are determined by the applicable links, inheritance, security filtering, and policy processing rules.
+
+---
+
+## 10. Network and Infrastructure Communication Requirements
+
+The infrastructure requires network communication between clients, Domain Controllers, DNS services, and routing components.
+
+The following protocols and service ports are relevant to the implemented Active Directory architecture.
+
+| Protocol | Port | Purpose |
+|---|---:|---|
+| DNS | TCP/UDP 53 | DNS queries and zone-related communication |
+| Kerberos | TCP/UDP 88 | Authentication |
+| NTP | UDP 123 | Time synchronization |
+| RPC Endpoint Mapper | TCP 135 | RPC service discovery |
+| LDAP | TCP/UDP 389 | Directory access |
+| SMB | TCP 445 | SYSVOL and NETLOGON access |
+| Kerberos Password Change | TCP/UDP 464 | Kerberos password operations |
+| LDAPS | TCP 636 | LDAP over SSL/TLS, if configured |
+| Global Catalog | TCP 3268 | Global Catalog queries |
+| Global Catalog over SSL | TCP 3269 | Secure Global Catalog queries, if configured |
+| RPC Dynamic Ports | TCP 49152–65535 | Dynamic RPC communication on modern Windows Server |
+
+**Note:** This table identifies relevant Active Directory protocols and standard ports. It does not claim that every listed protocol was independently tested or that LDAPS was configured. Firewall rules must be designed according to actual service requirements and the intended network security policy.
+
+---
+
+## 11. Architecture Design Considerations
+
+The architecture is based on the following design principles:
+
+### 11.1 Site Separation
+
+HQ and Branch use separate IP subnets and distinct Active Directory sites. This provides logical site awareness for domain controller discovery and replication.
+
+### 11.2 Centralized Identity Management
+
+Both locations operate within the same Active Directory domain, allowing centralized management of users, groups, computers, and security policies.
+
+### 11.3 Distributed Domain Controller Services
+
+Each site has a local Domain Controller providing directory services and DNS capabilities.
+
+### 11.4 Controlled Inter-Site Connectivity
+
+A dedicated routing virtual machine connects the two network segments, allowing communication between sites.
+
+### 11.5 Centralized Policy Management
+
+Group Policy provides a centralized mechanism for configuring domain account security and workstation settings.
+
+### 11.6 Validation and Recovery
+
+The architecture is tested through authentication, DNS, replication, SYSVOL, Group Policy, and Domain Controller failure/recovery scenarios.
+
+---
+
+## 12. Architecture Summary
+
+The completed infrastructure represents a two-site Active Directory deployment built using Windows Server 2022 and VMware Workstation.
+
+It includes:
+
+- One Active Directory forest and domain.
+- Two writable Domain Controllers.
+- Two DNS servers.
+- Two Active Directory sites.
+- Two mapped IP subnets.
+- One configured inter-site replication link.
+- One Windows Server routing virtual machine.
+- One Windows 11 domain-joined workstation.
+- Organizational Units and Global Security Groups.
+- Domain account and workstation Group Policy configurations.
+- Validated Active Directory replication and recovery operations.
+
+The architecture demonstrates how a small enterprise environment can distribute Domain Controller services across two network locations while maintaining centralized identity management and directory synchronization.
+
+---
+
+**Document:** Phase 08.2 — Architecture & Network Topology  
+**Project:** Active Directory Multi-Site and Replication Infrastructure  
+**Forest / Domain:** adlab.test  
+**Virtualization Platform:** VMware Workstation  
+**Server Platform:** Windows Server 2022  
+**Client Platform:** Windows 11 Pro  
+**Status:** Architecture and network topology documentation completed.

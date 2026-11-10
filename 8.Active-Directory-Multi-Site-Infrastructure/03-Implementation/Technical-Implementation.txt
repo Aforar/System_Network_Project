@@ -1,0 +1,1584 @@
+# Phase 08.3 — Complete Technical Implementation Documentation
+
+**Project:** Active Directory Multi-Site and Replication Infrastructure  
+**Domain:** adlab.test  
+**NetBIOS:** ADLAB  
+**Virtualization Platform:** VMware Workstation  
+**Server Operating System:** Windows Server 2022  
+**Client Operating System:** Windows 11 Pro  
+**Documentation Status:** Implementation and validation completed
+
+---
+
+# Table of Contents
+
+1. Environment Preparation
+2. Virtual Machine Creation and OS Installation
+3. Network Design and Configuration
+4. Active Directory Domain Services Deployment
+5. Active Directory Sites and Services
+6. Client Domain Join and Group Policy
+7. Infrastructure Validation and Troubleshooting
+8. Final Infrastructure Configuration
+
+---
+
+# 1. Environment Preparation
+
+## 1.1 Objective
+
+Prepare the virtualization environment, installation media, and project directory structure required to deploy the Active Directory multi-site infrastructure.
+
+## 1.2 Virtualization Platform
+
+The project uses VMware Workstation to create and operate the virtual infrastructure.
+
+VMware virtual networking is used to simulate two separate enterprise network locations:
+
+- Headquarters (HQ).
+- Branch office.
+
+## 1.3 Installation Media
+
+The following operating system installation media is prepared:
+
+- Windows Server 2022 ISO.
+- Windows 11 Pro ISO.
+
+The installation files are organized for use during virtual machine deployment.
+
+## 1.4 Integrity Verification
+
+SHA-256 checksums are used to verify the integrity of the installation media.
+
+PowerShell command:
+
+```powershell
+Get-FileHash "C:\Path\To\WindowsServer2022.iso" -Algorithm SHA256
+```
+
+Repeat the command for the Windows 11 ISO.
+
+The calculated hashes can be compared with trusted published checksums when available.
+
+## 1.5 Project Organization
+
+The project uses an organized directory structure to separate installation media, screenshots, and documentation.
+
+The screenshots are organized by implementation phase to maintain traceability between configuration activities and validation evidence.
+
+**Phase 01 Deliverables:**
+
+- Prepared installation media.
+- Verified file integrity.
+- Project directory structure.
+- Host environment verification evidence.
+
+---
+
+# 2. Virtual Machine Creation and OS Installation
+
+## 2.1 Objective
+
+Create the virtual machines required to represent the HQ site, Branch site, domain workstation, and inter-site routing infrastructure.
+
+## 2.2 Virtual Machine Inventory
+
+Four virtual machines are deployed.
+
+| Virtual Machine | Operating System | Role | vCPU | RAM | Virtual Disk |
+|---|---|---|---:|---:|---:|
+| DC-HQ | Windows Server 2022 | HQ Domain Controller | 2 | 4 GB | 40 GB |
+| DC-BRANCH | Windows Server 2022 | Branch Domain Controller | 2 | 4 GB | 40 GB |
+| CLIENT-HQ | Windows 11 Pro | Domain workstation | 2 | 4 GB | 30 GB |
+| RTR-HQ-BRANCH | Windows Server 2022 | Network router | — | — | — |
+
+The router's exact CPU, memory, and disk allocation are not specified in this documentation.
+
+Virtual disks are configured as thin-provisioned disks.
+
+## 2.3 Operating System Installation
+
+Install the appropriate operating system on each virtual machine.
+
+### DC-HQ
+
+Install Windows Server 2022 and configure the computer name:
+
+```text
+DC-HQ
+```
+
+### DC-BRANCH
+
+Install Windows Server 2022 and configure the computer name:
+
+```text
+DC-BRANCH
+```
+
+### CLIENT-HQ
+
+Install Windows 11 Pro and configure the computer name:
+
+```text
+CLIENT-HQ
+```
+
+### RTR-HQ-BRANCH
+
+Install Windows Server 2022 and configure the computer name:
+
+```text
+RTR-HQ-BRANCH
+```
+
+The router is used for inter-subnet communication and is not configured as a Domain Controller.
+
+## 2.4 Phase 02 Deliverables
+
+- Four virtual machines.
+- Windows Server 2022 installations.
+- Windows 11 Pro installation.
+- Configured hostnames.
+- Virtual machine installation evidence.
+
+---
+
+# 3. Network Design and Configuration
+
+## 3.1 Objective
+
+Design and configure two separate IPv4 networks and establish communication between them through a Windows Server routing infrastructure.
+
+## 3.2 Network Topology
+
+Two VMware host-only virtual networks are created.
+
+| VMware Network | Network Type | Network Address |
+|---|---|---|
+| VMnet2 | Host-only | 192.168.10.0/24 |
+| VMnet3 | Host-only | 192.168.20.0/24 |
+
+The networks represent the Headquarters and Branch locations.
+
+## 3.3 HQ Network Configuration
+
+**Network:** 192.168.10.0/24
+
+| Device | IPv4 Address | Subnet Mask | Gateway | DNS |
+|---|---|---|---|---|
+| DC-HQ | 192.168.10.10 | 255.255.255.0 | 192.168.10.254 | 192.168.10.10 |
+| CLIENT-HQ | 192.168.10.20 | 255.255.255.0 | 192.168.10.254 | 192.168.10.10 |
+| RTR-HQ-BRANCH | 192.168.10.254 | 255.255.255.0 | — | — |
+
+## 3.4 Branch Network Configuration
+
+**Network:** 192.168.20.0/24
+
+| Device | IPv4 Address | Subnet Mask | Gateway | Initial DNS Configuration |
+|---|---|---|---|---|
+| DC-BRANCH | 192.168.20.10 | 255.255.255.0 | 192.168.20.254 | 192.168.10.10 |
+| RTR-HQ-BRANCH | 192.168.20.254 | 255.255.255.0 | — | — |
+
+The Branch Domain Controller's initial DNS configuration points to the HQ DNS server to support domain discovery and joining the existing domain.
+
+## 3.5 Router Configuration
+
+The Windows Server 2022 router has two network interfaces.
+
+| Interface | IPv4 Address | Connected Network |
+|---|---|---|
+| Ethernet0 | 192.168.10.254/24 | VMnet2 |
+| Ethernet1 | 192.168.20.254/24 | VMnet3 |
+
+The router provides connectivity between the two subnets.
+
+The configured network paths are:
+
+```text
+192.168.10.0/24
+        |
+        |
+192.168.10.254
+        |
+   RTR-HQ-BRANCH
+        |
+192.168.20.254
+        |
+        |
+192.168.20.0/24
+```
+
+The Windows Server routing infrastructure is configured to forward traffic between the two networks.
+
+## 3.6 Network Validation
+
+Check the IPv4 configuration:
+
+```cmd
+ipconfig /all
+```
+
+Test basic network connectivity.
+
+From DC-HQ:
+
+```cmd
+ping 192.168.10.254
+ping 192.168.20.254
+ping 192.168.20.10
+```
+
+From DC-BRANCH:
+
+```cmd
+ping 192.168.20.254
+ping 192.168.10.254
+ping 192.168.10.10
+```
+
+From CLIENT-HQ:
+
+```cmd
+ping 192.168.10.10
+ping 192.168.20.10
+```
+
+Successful connectivity confirms that the tested network paths are reachable.
+
+**Phase 03 Deliverables:**
+
+- Two isolated VMware networks.
+- Static IPv4 configuration.
+- Configured inter-site routing.
+- Successful connectivity tests.
+
+---
+
+# 4. Active Directory Domain Services Deployment
+
+## 4.1 Objective
+
+Deploy a new Active Directory forest and domain, promote the HQ server as the first Domain Controller, and integrate the Branch server as an additional Domain Controller.
+
+## 4.2 Domain Configuration
+
+The Active Directory environment uses the following configuration:
+
+| Parameter | Value |
+|---|---|
+| Forest Name | adlab.test |
+| Domain Name | adlab.test |
+| NetBIOS Name | ADLAB |
+| Forest Functional Level | Windows Server 2016 |
+| Domain Controller Operating System | Windows Server 2022 |
+
+## 4.3 DC-HQ Preparation
+
+On DC-HQ:
+
+1. Configure the hostname as `DC-HQ`.
+2. Configure the static IPv4 address.
+3. Configure the preferred DNS server.
+4. Verify network connectivity.
+5. Open Server Manager.
+
+Install the Active Directory Domain Services and DNS Server roles.
+
+The role installation can be performed through:
+
+```text
+Server Manager
+    > Manage
+        > Add Roles and Features
+            > Active Directory Domain Services
+            > DNS Server
+```
+
+## 4.4 Promote DC-HQ
+
+After installing AD DS:
+
+1. Open Server Manager.
+2. Select the notification flag.
+3. Select Promote this server to a domain controller.
+4. Select Add a new forest.
+5. Enter:
+
+```text
+adlab.test
+```
+
+6. Configure the forest and domain functional levels as Windows Server 2016.
+7. Enable DNS Server.
+8. Keep Global Catalog enabled.
+9. Configure the Directory Services Restore Mode (DSRM) password.
+10. Complete the prerequisite checks.
+11. Start the promotion process.
+12. Allow the server to restart.
+
+After restarting, DC-HQ becomes the first Domain Controller in the new forest.
+
+## 4.5 Verify DC-HQ Services
+
+Open PowerShell as Administrator:
+
+```powershell
+Get-Service NTDS,DNS,Netlogon,DFSR,KDC
+```
+
+Expected status:
+
+```text
+Running
+```
+
+Verify domain information:
+
+```powershell
+Get-ADDomain
+```
+
+Verify forest information:
+
+```powershell
+Get-ADForest
+```
+
+Check SYSVOL and NETLOGON shares:
+
+```cmd
+net share
+```
+
+The following shares should be available:
+
+```text
+SYSVOL
+NETLOGON
+```
+
+## 4.6 DNS Configuration
+
+The DNS role is installed as part of the Domain Controller deployment.
+
+The Active Directory DNS zones include:
+
+```text
+adlab.test
+_msdcs.adlab.test
+```
+
+These zones are configured as Active Directory-integrated DNS zones.
+
+Verify DNS zones through PowerShell:
+
+```powershell
+Get-DnsServerZone
+```
+
+Check DNS records:
+
+```powershell
+Get-DnsServerResourceRecord -ZoneName "adlab.test"
+```
+
+Check Domain Controller discovery records:
+
+```cmd
+nslookup -type=SRV _ldap._tcp.dc._msdcs.adlab.test
+```
+
+## 4.7 DC-BRANCH Preparation
+
+On DC-BRANCH:
+
+1. Configure the hostname as `DC-BRANCH`.
+2. Configure its static IPv4 address.
+3. Configure its default gateway.
+4. Configure its initial DNS server to point to DC-HQ.
+5. Verify inter-site network connectivity.
+6. Join the server to the existing domain `adlab.test`.
+
+After joining the domain, install the AD DS and DNS Server roles.
+
+## 4.8 Promote DC-BRANCH
+
+Use Server Manager to promote DC-BRANCH.
+
+1. Open Server Manager.
+2. Select the notification flag.
+3. Select Promote this server to a domain controller.
+4. Select Add a domain controller to an existing domain.
+5. Enter the domain:
+
+```text
+adlab.test
+```
+
+6. Supply an account authorized to perform the promotion.
+7. Enable DNS Server.
+8. Keep Global Catalog enabled.
+9. Configure the DSRM password.
+10. Complete the prerequisite checks.
+11. Start the promotion process.
+12. Restart the server when requested.
+
+After the restart, DC-BRANCH becomes an additional Domain Controller in the existing domain.
+
+## 4.9 Verify Both Domain Controllers
+
+Run:
+
+```powershell
+Get-ADDomainController -Filter * |
+Select-Object HostName,IPv4Address,Site,IsGlobalCatalog
+```
+
+Expected Domain Controllers:
+
+| Hostname | IPv4 Address | Global Catalog |
+|---|---|---|
+| DC-HQ | 192.168.10.10 | True |
+| DC-BRANCH | 192.168.20.10 | True |
+
+Check replication summary:
+
+```cmd
+repadmin /replsummary
+```
+
+Check detailed replication status:
+
+```cmd
+repadmin /showrepl
+```
+
+Run basic Domain Controller diagnostics:
+
+```cmd
+dcdiag
+```
+
+The deployment was validated through service checks, DNS checks, directory replication checks, and SYSVOL/NETLOGON verification.
+
+**Phase 04 Deliverables:**
+
+- Active Directory forest and domain.
+- Two promoted Domain Controllers.
+- DNS Server roles.
+- Global Catalog configuration.
+- SYSVOL and NETLOGON shares.
+- Initial replication validation.
+
+---
+
+# 5. Active Directory Sites and Services
+
+## 5.1 Objective
+
+Configure Active Directory Sites and Services to represent the two network locations and define the inter-site replication relationship.
+
+## 5.2 Initial Inspection
+
+Open:
+
+```text
+Server Manager
+    > Tools
+        > Active Directory Sites and Services
+```
+
+The initial environment contained the default site:
+
+```text
+Default-First-Site-Name
+```
+
+The initial configuration did not contain the intended HQ and Branch site separation.
+
+## 5.3 Create HQ-Site
+
+In Active Directory Sites and Services:
+
+1. Right-click Sites.
+2. Select New Site.
+3. Enter:
+
+```text
+HQ-Site
+```
+
+4. Select the available site link.
+5. Confirm the creation.
+
+## 5.4 Create Branch-Site
+
+Repeat the process and create:
+
+```text
+Branch-Site
+```
+
+Both sites are now available in the Active Directory site structure.
+
+## 5.5 Create and Associate Subnets
+
+Create the HQ subnet:
+
+```text
+192.168.10.0/24
+```
+
+Associate it with:
+
+```text
+HQ-Site
+```
+
+Create the Branch subnet:
+
+```text
+192.168.20.0/24
+```
+
+Associate it with:
+
+```text
+Branch-Site
+```
+
+This configuration enables Active Directory to associate IP addresses with the correct logical site.
+
+## 5.6 Move Domain Controllers
+
+Open:
+
+```text
+Sites
+    > Default-First-Site-Name
+        > Servers
+```
+
+Move the Domain Controller objects:
+
+- Move DC-HQ to HQ-Site.
+- Move DC-BRANCH to Branch-Site.
+
+The default site is retained without these Domain Controller objects.
+
+## 5.7 Configure the Site Link
+
+Open:
+
+```text
+Sites
+    > Inter-Site Transports
+        > IP
+```
+
+Edit the default site link and configure:
+
+| Setting | Value |
+|---|---|
+| Name | HQ-BRANCH-SiteLink |
+| Site Membership | HQ-Site, Branch-Site |
+| Cost | 100 |
+| Replication Interval | 15 minutes |
+
+Remove `Default-First-Site-Name` from the site link membership.
+
+The resulting link connects the two intended sites.
+
+## 5.8 Verify Site Configuration
+
+Run on a Domain Controller:
+
+```powershell
+Get-ADDomainController -Filter * |
+Select-Object HostName,Site,IPv4Address,IsGlobalCatalog
+```
+
+Expected site association:
+
+```text
+DC-HQ       HQ-Site
+DC-BRANCH   Branch-Site
+```
+
+Verify subnets:
+
+```powershell
+Get-ADReplicationSubnet -Filter * |
+Select-Object Name,Site
+```
+
+Verify the site link:
+
+```powershell
+Get-ADReplicationSiteLink -Filter * |
+Select-Object Name,Cost,ReplicationFrequencyInMinutes
+```
+
+Expected:
+
+```text
+Name: HQ-BRANCH-SiteLink
+Cost: 100
+ReplicationFrequencyInMinutes: 15
+```
+
+Verify the local site from each Domain Controller:
+
+```cmd
+nltest /dsgetsite
+```
+
+Expected:
+
+- DC-HQ: HQ-Site.
+- DC-BRANCH: Branch-Site.
+
+## 5.9 Validate Replication
+
+Run:
+
+```cmd
+repadmin /replsummary
+```
+
+Then:
+
+```cmd
+repadmin /showrepl
+```
+
+Force synchronization:
+
+```cmd
+repadmin /syncall /AdeP
+```
+
+The synchronization validation completed without errors, and subsequent replication summary checks reported zero failures.
+
+**Phase 05 Deliverables:**
+
+- HQ-Site.
+- Branch-Site.
+- Two mapped subnets.
+- Correct Domain Controller placement.
+- HQ-BRANCH-SiteLink.
+- Verified site discovery and replication.
+
+---
+
+# 6. Client Domain Join and Group Policy
+
+## 6.1 Objective
+
+Integrate the Windows 11 workstation into the Active Directory domain, organize directory objects, create test users and security groups, and deploy centralized Group Policy settings.
+
+## 6.2 CLIENT-HQ Network Configuration
+
+The Windows 11 workstation uses the following network configuration:
+
+| Setting | Value |
+|---|---|
+| Hostname | CLIENT-HQ |
+| IPv4 Address | 192.168.10.20 |
+| Subnet Mask | 255.255.255.0 |
+| Default Gateway | 192.168.10.254 |
+| Preferred DNS | 192.168.10.10 |
+| DNS Suffix | adlab.test |
+
+Verify the configuration:
+
+```cmd
+ipconfig /all
+```
+
+## 6.3 Join CLIENT-HQ to the Domain
+
+On CLIENT-HQ:
+
+1. Open System Properties.
+2. Select Computer Name.
+3. Select Change.
+4. Select Domain.
+5. Enter:
+
+```text
+adlab.test
+```
+
+6. Supply authorized domain credentials.
+7. Confirm the domain join.
+8. Restart the workstation.
+
+Verify the domain membership:
+
+```cmd
+systeminfo
+```
+
+Review the Domain field in the output.
+
+The workstation is now joined to the Active Directory domain.
+
+## 6.4 Create the Organizational Unit Structure
+
+On DC-HQ, open:
+
+```text
+Server Manager
+    > Tools
+        > Active Directory Users and Computers
+```
+
+Create the parent OU:
+
+```text
+ADLAB
+```
+
+Create the following child OUs:
+
+```text
+ADLAB
+│
+├── Users
+│   ├── IT
+│   ├── HR
+│   └── General
+│
+├── Groups
+│
+└── Computers
+    ├── Workstations
+    └── Servers
+```
+
+This structure separates users, groups, workstations, and servers into logical administrative containers.
+
+## 6.5 Create Global Security Groups
+
+Inside:
+
+```text
+ADLAB > Groups
+```
+
+Create the following groups:
+
+| Group | Scope | Type |
+|---|---|---|
+| GG_IT_Support | Global | Security |
+| GG_HR | Global | Security |
+| GG_Employees | Global | Security |
+
+These groups are used to organize test user accounts according to their logical department or function.
+
+## 6.6 Create Test User Accounts
+
+Create the following accounts:
+
+| Display Name | Username | OU |
+|---|---|---|
+| IT Administrator | it.admin | Users/IT |
+| HR User | hr.user | Users/HR |
+| Standard User | employee01 | Users/General |
+
+Assign secure lab passwords.
+
+The test accounts are created as standard user accounts unless a specific administrative privilege is required.
+
+The IT Administrator test account is not automatically granted Domain Admin privileges.
+
+## 6.7 Configure Group Membership
+
+Add the users to their corresponding groups:
+
+| User | Group |
+|---|---|
+| it.admin | GG_IT_Support |
+| hr.user | GG_HR |
+| employee01 | GG_Employees |
+
+Verify group membership through:
+
+```text
+User Properties
+    > Member Of
+```
+
+PowerShell verification:
+
+```powershell
+Get-ADGroup -Filter 'Name -like "GG_*"' |
+Select-Object Name,GroupScope,GroupCategory
+```
+
+## 6.8 Move CLIENT-HQ to the Workstations OU
+
+In Active Directory Users and Computers:
+
+1. Locate the default Computers container.
+2. Find CLIENT-HQ.
+3. Right-click the computer object.
+4. Select Move.
+5. Select:
+
+```text
+ADLAB > Computers > Workstations
+```
+
+Verify the computer account:
+
+```powershell
+Get-ADComputer CLIENT-HQ |
+Select-Object Name,DistinguishedName
+```
+
+Expected distinguished name:
+
+```text
+CN=CLIENT-HQ,OU=Workstations,OU=Computers,OU=ADLAB,DC=adlab,DC=test
+```
+
+## 6.9 Configure Domain Account Policy
+
+Open Group Policy Management:
+
+```text
+Server Manager
+    > Tools
+        > Group Policy Management
+```
+
+Create:
+
+```text
+GPO-Domain-Account-Policy
+```
+
+Link the GPO to the domain root:
+
+```text
+adlab.test
+```
+
+Edit the GPO and navigate to:
+
+```text
+Computer Configuration
+    > Policies
+        > Windows Settings
+            > Security Settings
+                > Account Policies
+```
+
+### Password Policy
+
+Configure:
+
+| Policy | Value |
+|---|---|
+| Enforce Password History | 10 passwords |
+| Maximum Password Age | 90 days |
+| Minimum Password Age | 1 day |
+| Minimum Password Length | 12 characters |
+| Password Must Meet Complexity Requirements | Enabled |
+| Store Passwords Using Reversible Encryption | Disabled |
+
+### Account Lockout Policy
+
+Configure:
+
+| Policy | Value |
+|---|---|
+| Account Lockout Threshold | 5 invalid attempts |
+| Account Lockout Duration | 15 minutes |
+| Reset Account Lockout Counter After | 15 minutes |
+
+The policy is linked at the domain root because domain password and lockout settings are domain-account policies.
+
+These values represent the lab configuration and should be reviewed before use in a production environment.
+
+## 6.10 Configure Workstation Security Baseline
+
+Create:
+
+```text
+GPO-Workstation-Security-Baseline
+```
+
+Link it to:
+
+```text
+ADLAB > Computers > Workstations
+```
+
+### A. Interactive Logon Message
+
+Navigate to:
+
+```text
+Computer Configuration
+    > Policies
+        > Windows Settings
+            > Security Settings
+                > Local Policies
+                    > Security Options
+```
+
+Configure:
+
+**Interactive logon: Message title for users attempting to log on**
+
+```text
+AUTHORIZED ACCESS ONLY
+```
+
+**Interactive logon: Message text for users attempting to log on**
+
+```text
+This system is restricted to authorized users. All activities may be monitored.
+```
+
+### B. Screen Saver Security
+
+Navigate to:
+
+```text
+Computer Configuration
+    > Policies
+        > Administrative Templates
+            > Control Panel
+                > Personalization
+```
+
+Configure:
+
+| Policy | Value |
+|---|---|
+| Enable Screen Saver | Enabled |
+| Password Protect the Screen Saver | Enabled |
+| Screen Saver Timeout | 600 seconds |
+
+A suitable screen saver must also be configured for the timeout behavior to operate as intended.
+
+### C. Microsoft Defender Antivirus
+
+Navigate to:
+
+```text
+Computer Configuration
+    > Policies
+        > Administrative Templates
+            > Windows Components
+                > Microsoft Defender Antivirus
+```
+
+Configure:
+
+```text
+Turn off Microsoft Defender Antivirus = Disabled
+```
+
+This setting prevents this policy from instructing Windows to turn off Microsoft Defender Antivirus. It does not independently guarantee the operational state of every Defender protection feature.
+
+### D. Windows Defender Firewall
+
+Navigate to:
+
+```text
+Computer Configuration
+    > Policies
+        > Windows Settings
+            > Security Settings
+                > Windows Defender Firewall with Advanced Security
+```
+
+Ensure Windows Defender Firewall is configured as enabled for the applicable profiles:
+
+- Domain Profile.
+- Private Profile.
+- Public Profile.
+
+The configuration must preserve required network communication for domain operations.
+
+## 6.11 Apply Group Policy
+
+On CLIENT-HQ:
+
+```cmd
+gpupdate /force
+```
+
+Review the applied policies:
+
+```cmd
+gpresult /r
+```
+
+Generate an HTML report:
+
+```cmd
+gpresult /h C:\gpresult.html
+```
+
+Open:
+
+```text
+C:\gpresult.html
+```
+
+Review the applied Group Policy Objects and their configuration.
+
+The workstation is expected to receive:
+
+- GPO-Domain-Account-Policy through the domain-level policy configuration.
+- GPO-Workstation-Security-Baseline through its Workstations OU link.
+
+**Phase 06 Deliverables:**
+
+- Domain-joined Windows 11 workstation.
+- Organizational Unit hierarchy.
+- Three Global Security Groups.
+- Three test user accounts.
+- Computer account placement.
+- Domain account policy.
+- Workstation security baseline.
+- Group Policy application evidence.
+
+---
+
+# 7. Infrastructure Validation and Troubleshooting
+
+## 7.1 Objective
+
+Validate the completed infrastructure and verify that its main services operate correctly.
+
+The validation process covers authentication, DNS resolution, Active Directory replication, SYSVOL and NETLOGON, Group Policy application, and Domain Controller failure/recovery.
+
+## 7.2 Authentication Validation
+
+Perform domain authentication tests using the three test user accounts.
+
+Test accounts:
+
+```text
+ADLAB\it.admin
+ADLAB\hr.user
+ADLAB\employee01
+```
+
+After signing in, run:
+
+```cmd
+whoami
+```
+
+Verify the current security identity.
+
+Review group memberships:
+
+```cmd
+whoami /all
+```
+
+Identify the Domain Controller used for logon:
+
+```cmd
+echo %LOGONSERVER%
+```
+
+Expected result: the client successfully authenticates using an available Domain Controller.
+
+The authentication test also confirms that the test users belong to their intended security groups.
+
+## 7.3 DNS Resolution Validation
+
+On CLIENT-HQ, test the domain:
+
+```cmd
+nslookup adlab.test
+```
+
+Test the HQ Domain Controller:
+
+```cmd
+nslookup DC-HQ.adlab.test
+```
+
+Test the Branch Domain Controller:
+
+```cmd
+nslookup DC-BRANCH.adlab.test
+```
+
+Expected address resolution:
+
+| DNS Name | Expected Address |
+|---|---|
+| adlab.test | 192.168.10.10 and 192.168.20.10 |
+| DC-HQ.adlab.test | 192.168.10.10 |
+| DC-BRANCH.adlab.test | 192.168.20.10 |
+
+Verify LDAP SRV records:
+
+```cmd
+nslookup -type=SRV _ldap._tcp.dc._msdcs.adlab.test
+```
+
+Verify Kerberos SRV records:
+
+```cmd
+nslookup -type=SRV _kerberos._tcp.adlab.test
+```
+
+PowerShell verification:
+
+```powershell
+Resolve-DnsName DC-HQ.adlab.test
+Resolve-DnsName DC-BRANCH.adlab.test
+Resolve-DnsName _ldap._tcp.dc._msdcs.adlab.test -Type SRV
+```
+
+Run DNS diagnostics on both Domain Controllers:
+
+```cmd
+dcdiag /test:dns /v
+```
+
+## 7.4 Active Directory Replication Validation
+
+Check the overall replication status:
+
+```cmd
+repadmin /replsummary
+```
+
+Review detailed replication information:
+
+```cmd
+repadmin /showrepl
+```
+
+Run a synchronization operation:
+
+```cmd
+repadmin /syncall /AdeP
+```
+
+The expected result is successful synchronization without replication errors.
+
+### Functional Replication Test
+
+A temporary user account is created on DC-HQ:
+
+```text
+replication.test
+```
+
+The account is created inside:
+
+```text
+ADLAB > Users > General
+```
+
+After replication, connect to DC-BRANCH through Active Directory Users and Computers and verify that the account is present.
+
+This confirms that the directory change has propagated between the Domain Controllers.
+
+The temporary account can be removed after the test.
+
+### Replication Partner Verification
+
+Run:
+
+```powershell
+Get-ADReplicationPartnerMetadata -Target DC-HQ -Scope Server
+```
+
+On DC-BRANCH:
+
+```powershell
+Get-ADReplicationPartnerMetadata -Target DC-BRANCH -Scope Server
+```
+
+The validation confirmed successful replication between both Domain Controllers.
+
+## 7.5 SYSVOL and NETLOGON Validation
+
+Check the shared resources on both Domain Controllers:
+
+```cmd
+net share
+```
+
+Expected shares:
+
+```text
+SYSVOL
+NETLOGON
+```
+
+From CLIENT-HQ, test access to DC-HQ:
+
+```cmd
+dir \\DC-HQ\SYSVOL
+dir \\DC-HQ\NETLOGON
+```
+
+Test access to DC-BRANCH:
+
+```cmd
+dir \\DC-BRANCH\SYSVOL
+dir \\DC-BRANCH\NETLOGON
+```
+
+Verify DFS Replication service:
+
+```powershell
+Get-Service DFSR
+```
+
+Verify SYSVOL readiness:
+
+```cmd
+dcdiag /test:sysvolcheck
+```
+
+Verify Domain Controller advertising:
+
+```cmd
+dcdiag /test:advertising
+```
+
+Verify DFSR migration state:
+
+```cmd
+dfsrmig /getglobalstate
+```
+
+The configured SYSVOL migration state is:
+
+```text
+Eliminated
+```
+
+The validation confirmed that SYSVOL and NETLOGON were available on both Domain Controllers.
+
+## 7.6 Group Policy Validation
+
+On CLIENT-HQ, force policy refresh:
+
+```cmd
+gpupdate /force
+```
+
+Review applied policies:
+
+```cmd
+gpresult /r
+```
+
+Generate a detailed HTML report:
+
+```cmd
+gpresult /h C:\gpresult.html
+```
+
+Review the following:
+
+- Applied Computer Group Policy Objects.
+- Applied User Group Policy Objects.
+- Denied Group Policy Objects.
+- Policy processing results.
+
+### Interactive Logon Message
+
+Sign out from CLIENT-HQ.
+
+The configured logon message should display:
+
+```text
+AUTHORIZED ACCESS ONLY
+```
+
+Message:
+
+```text
+This system is restricted to authorized users. All activities may be monitored.
+```
+
+### Microsoft Defender Status
+
+Run:
+
+```powershell
+Get-MpComputerStatus
+```
+
+Review the reported Microsoft Defender Antivirus status.
+
+### Windows Firewall Status
+
+Run:
+
+```powershell
+Get-NetFirewallProfile |
+Select-Object Name,Enabled
+```
+
+Review the firewall state for the available profiles.
+
+The Group Policy validation confirmed that the intended workstation security policies were applied and their corresponding settings were checked.
+
+## 7.7 Domain Controller Failure and Recovery
+
+### Objective
+
+Simulate the unavailability of the Branch Domain Controller and verify that the HQ-side infrastructure remains operational.
+
+The test also verifies that DC-BRANCH can return to service and resume normal replication.
+
+### Pre-Failure Health Check
+
+Before shutting down DC-BRANCH, run:
+
+```cmd
+repadmin /replsummary
+```
+
+Check Domain Controller diagnostics:
+
+```cmd
+dcdiag /v
+```
+
+Record the current client logon server:
+
+```cmd
+echo %LOGONSERVER%
+```
+
+### Simulate Branch Domain Controller Failure
+
+Using VMware Workstation:
+
+1. Select the DC-BRANCH virtual machine.
+2. Select Power.
+3. Select Shut Down Guest.
+4. Wait until the virtual machine is completely shut down.
+
+A normal guest operating system shutdown is used rather than an abrupt power-off.
+
+### Validate HQ Availability
+
+While DC-BRANCH is offline, test connectivity from CLIENT-HQ:
+
+```cmd
+ping 192.168.10.10
+```
+
+Test HQ DNS:
+
+```cmd
+nslookup DC-HQ.adlab.test
+```
+
+Test Domain Controller discovery:
+
+```cmd
+nltest /dsgetdc:adlab.test
+```
+
+The expected result is successful discovery of an available Domain Controller, with DC-HQ remaining accessible.
+
+### Authentication During Branch Outage
+
+Sign out from CLIENT-HQ.
+
+Sign in using a domain account that has previously logged on to the workstation.
+
+Run:
+
+```cmd
+whoami
+```
+
+Then:
+
+```cmd
+echo %LOGONSERVER%
+```
+
+The logon server should identify DC-HQ for this test.
+
+Using an account with previously cached credentials avoids confusing cached interactive logon with a first-time online authentication attempt.
+
+### Recover DC-BRANCH
+
+Start the DC-BRANCH virtual machine using VMware Workstation.
+
+Allow Windows Server and Active Directory services to initialize.
+
+Verify the required services:
+
+```powershell
+Get-Service NTDS,DNS,Netlogon,DFSR,KDC
+```
+
+Expected service state:
+
+```text
+Running
+```
+
+### Validate Replication After Recovery
+
+On DC-HQ:
+
+```cmd
+repadmin /replsummary
+```
+
+Review detailed replication:
+
+```cmd
+repadmin /showrepl
+```
+
+Force synchronization:
+
+```cmd
+repadmin /syncall /AdeP
+```
+
+Expected result:
+
+```text
+SyncAll terminated with no errors.
+```
+
+Run the replication summary again:
+
+```cmd
+repadmin /replsummary
+```
+
+Confirm that replication has returned to a healthy state.
+
+### Validate SYSVOL After Recovery
+
+From CLIENT-HQ:
+
+```cmd
+dir \\DC-BRANCH\SYSVOL
+```
+
+Then:
+
+```cmd
+dir \\DC-BRANCH\NETLOGON
+```
+
+Successful access confirms that the Branch Domain Controller's shared resources are available again.
+
+The failure/recovery validation confirmed that HQ remained available during the simulated Branch Domain Controller outage and that DC-BRANCH returned to service with replication restored.
+
+---
+
+# 8. Final Infrastructure Configuration
+
+## 8.1 Final Virtual Machine Inventory
+
+| Hostname | Operating System | Role | IPv4 Address |
+|---|---|---|---|
+| DC-HQ | Windows Server 2022 | HQ Domain Controller and DNS | 192.168.10.10 |
+| DC-BRANCH | Windows Server 2022 | Branch Domain Controller and DNS | 192.168.20.10 |
+| CLIENT-HQ | Windows 11 Pro | Domain workstation | 192.168.10.20 |
+| RTR-HQ-BRANCH | Windows Server 2022 | Inter-site router | .10.254 / .20.254 |
+
+## 8.2 Final Active Directory Configuration
+
+| Component | Final Configuration |
+|---|---|
+| Forest | adlab.test |
+| Domain | adlab.test |
+| NetBIOS | ADLAB |
+| Domain Controllers | DC-HQ, DC-BRANCH |
+| HQ Site | HQ-Site |
+| Branch Site | Branch-Site |
+| HQ Subnet | 192.168.10.0/24 |
+| Branch Subnet | 192.168.20.0/24 |
+| Site Link | HQ-BRANCH-SiteLink |
+| Site Link Cost | 100 |
+| Replication Interval | 15 minutes |
+| Global Catalog | Enabled on both DCs |
+| DNS | Active Directory-integrated |
+| SYSVOL Replication | DFSR |
+
+## 8.3 Final Group Policy Configuration
+
+| GPO | Link Location | Purpose |
+|---|---|---|
+| GPO-Domain-Account-Policy | Domain root | Password and account lockout configuration |
+| GPO-Workstation-Security-Baseline | Workstations OU | Workstation security configuration |
+
+## 8.4 Final Validation Results
+
+The completed validation phase covered the following areas:
+
+| Validation Area | Result |
+|---|---|
+| Domain Authentication | Successful |
+| DNS Resolution | Successful |
+| LDAP and Kerberos SRV Discovery | Successful |
+| Active Directory Replication | Successful |
+| SYSVOL Availability | Successful |
+| NETLOGON Availability | Successful |
+| Group Policy Application | Successful |
+| Domain Controller Failure Test | Successful |
+| Branch Domain Controller Recovery | Successful |
+| Post-Recovery Replication | Successful |
+
+All listed validation activities were completed successfully in the lab environment.
+
+---
+
+# 9. Conclusion
+
+The Active Directory Multi-Site and Replication Infrastructure project successfully demonstrates the deployment and validation of a two-site Windows Server Active Directory environment.
+
+The implementation includes centralized identity management, distributed Domain Controller services, DNS integration, inter-site routing, Active Directory Sites and Services, directory replication, Organizational Units, Global Security Groups, domain account policies, and workstation security configuration through Group Policy.
+
+The project also includes practical validation scenarios covering authentication, DNS resolution, directory replication, SYSVOL and NETLOGON availability, Group Policy processing, and Domain Controller failure and recovery.
+
+Through this implementation, the lab demonstrates practical knowledge of:
+
+- Windows Server 2022 administration.
+- Active Directory Domain Services.
+- DNS administration and troubleshooting.
+- Active Directory Sites and Services.
+- Inter-site network routing.
+- Active Directory replication.
+- DFS Replication and SYSVOL.
+- Group Policy management.
+- Windows domain authentication.
+- Infrastructure troubleshooting and recovery.
+
+This project provides a practical demonstration of the skills required to deploy, administer, validate, and troubleshoot a multi-site Microsoft Active Directory infrastructure.
+
+---
+
+**Document:** Phase 08.3 — Complete Technical Implementation Documentation  
+**Project:** Active Directory Multi-Site and Replication Infrastructure  
+**Domain:** adlab.test  
+**Platform:** VMware Workstation  
+**Implementation Status:** Completed  
+**Validation Status:** Completed  
+**Documentation Status:** Completed

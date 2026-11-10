@@ -1,0 +1,89 @@
+# Active Directory Multi-Site and Replication Infrastructure
+
+**Project Category:** IT Infrastructure / Systems Administration  
+**Project Type:** Hands-on Enterprise Infrastructure Lab  
+**Platform:** VMware Workstation  
+**Operating Systems:** Windows Server 2022, Windows 11 Pro  
+**Domain:** `adlab.test`  
+**Status:** Completed
+
+## Project Overview
+
+Designed, deployed, and validated a two-site Microsoft Active Directory infrastructure simulating a Headquarters (HQ) and Branch office environment.
+
+The project implements a centralized Windows domain with two domain controllers distributed across separate network subnets. It demonstrates practical experience in Windows Server administration, Active Directory Domain Services, DNS, multi-site replication, Group Policy management, and infrastructure troubleshooting.
+
+## Project Architecture
+
+| Component | Configuration |
+|---|---|
+| HQ Domain Controller | DC-HQ — `192.168.10.10` |
+| Branch Domain Controller | DC-BRANCH — `192.168.20.10` |
+| Client Workstation | CLIENT-HQ — `192.168.10.20` |
+| Domain | `adlab.test` |
+| HQ Network | `192.168.10.0/24` |
+| Branch Network | `192.168.20.0/24` |
+| HQ Active Directory Site | HQ-Site |
+| Branch Active Directory Site | Branch-Site |
+| Virtualization | VMware Workstation |
+
+## Implementation Summary
+
+### Phase 03 — Network Design and Configuration
+
+Designed two separate network segments for HQ and Branch environments. Configured static IP addressing, gateways, and inter-site routing to establish communication between the two networks.
+
+### Phase 04 — Active Directory Deployment
+
+Installed and configured Active Directory Domain Services. Created the `adlab.test` forest and deployed two domain controllers, with DNS and Global Catalog roles.
+
+### Phase 05 — Active Directory Sites and Services
+
+Implemented HQ-Site and Branch-Site, associated the corresponding network subnets, assigned domain controllers to their respective sites, and configured the `HQ-BRANCH-SiteLink` with a replication cost of 100 and a 15-minute replication interval.
+
+### Phase 06 — Client Domain Join and Group Policy
+
+Joined a Windows 11 workstation to the domain. Created Organizational Units, security groups, and test user accounts. Configured domain password and account lockout policies, along with a workstation security baseline.
+
+### Phase 07 — Validation and Troubleshooting
+
+Validated domain authentication, DNS resolution, Active Directory replication, SYSVOL and NETLOGON availability, and Group Policy application. Performed a controlled Branch domain controller shutdown and restart to verify HQ authentication availability for a previously logged-on account and subsequent Branch service recovery.
+
+## Key Highlights
+
+- Two-site Active Directory architecture.
+- Two Windows Server 2022 domain controllers.
+- Centralized DNS and identity management.
+- Active Directory Sites and Services configuration.
+- Inter-site directory replication.
+- Organizational Unit and security group management.
+- Centralized password and workstation security policies.
+- Windows 11 domain integration.
+- Replication and domain controller diagnostics.
+- Controlled domain controller outage and recovery testing.
+
+## Technologies and Tools
+
+Windows Server 2022, Active Directory Domain Services (AD DS), DNS Server, Group Policy Management (GPMC), Active Directory Sites and Services, DFS Replication (DFSR), VMware Workstation, Windows 11 Pro, PowerShell, DCDIAG, REPADMIN, NSLOOKUP.
+
+## Project Outcome
+
+Successfully deployed and validated a functional two-site Active Directory environment.
+
+The project demonstrates practical capabilities in Windows infrastructure deployment, domain administration, DNS troubleshooting, replication management, Group Policy configuration, and basic infrastructure recovery testing.
+
+## Scope and Limitations
+
+This project is a controlled virtual lab designed for practical learning and technical demonstration. The failure-recovery test does not represent a complete production high-availability or disaster-recovery solution.
+
+## Project Documentation
+
+The full project documentation includes:
+
+- Project Overview and Requirements.
+- Architecture and Network Topology.
+- Technical Implementation Documentation.
+- Validation Results and Troubleshooting Report.
+- Final Project Summary and Lessons Learned.
+
+**Project Status: Completed**
